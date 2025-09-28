@@ -41,30 +41,30 @@ services:
     volumes:
       - logims_local_redis_data:/data
 
-  celeryworker:
-    <<: *django
-    image: logims_local_celeryworker
-    container_name: logims_local_celeryworker
-    depends_on:
-      - redis
-      - postgres
-    ports: []
-    command: /start-celeryworker
-
-  celerybeat:
-    <<: *django
-    image: logims_local_celerybeat
-    container_name: logims_local_celerybeat
-    depends_on:
-      - redis
-      - postgres
-    ports: []
-    command: /start-celerybeat
-
-  flower:
-    <<: *django
-    image: logims_local_flower
-    container_name: logims_local_flower
-    ports:
-      - '5555:5555'
-    command: /start-flower
+#  celeryworker:
+#    <<: *django
+#    image: logims_local_celeryworker
+#    container_name: logims_local_celeryworker
+#    depends_on:
+#      - redis
+#      - postgres
+#    ports: []
+#    command: /start-celeryworker
+#
+#  celerybeat:
+#    <<: *django
+#    image: logims_local_celerybeat
+#    container_name: logims_local_celerybeat
+#    depends_on:
+#      - redis
+#      - postgres
+#    ports: []
+#    command: /start-celerybeat
+#
+#  flower:
+#    <<: *django
+#    image: logims_local_flower
+#    container_name: logims_local_flower
+#    ports:
+#      - '5555:5555'
+#    command: /start-flower
