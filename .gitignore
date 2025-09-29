@@ -10,6 +10,7 @@ __pycache__/
 .vscode
 .vscode/
 logims/docs/
+logims/logims/media/driver_documents
 
 # Distribution / packaging
 .Python
