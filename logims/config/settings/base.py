@@ -87,6 +87,9 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "logims.users",
+    "logims.companies",
+    "logims.drivers",
+    "logims.orders",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
