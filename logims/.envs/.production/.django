@@ -5,7 +5,7 @@ DJANGO_SETTINGS_MODULE=config.settings.production
 DJANGO_SECRET_KEY=fTmV7zhjXt6CNevoEBa0wKM79ti29VcFN3jrcapBei4rA4DRFttfuuqjjwhkVBIZ
 DJANGO_ADMIN_URL=XEpwABRfgSC7ge4iRVYc4htFR9zbLdg8/
 DJANGO_ALLOWED_HOSTS=.logims.com
-
+FRONTEND_URL="http://localhost:3000"
 # Security
 # ------------------------------------------------------------------------------
 # TIP: better off using DNS, however, redirect is OK too
