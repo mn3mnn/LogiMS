@@ -2,7 +2,7 @@
 # ------------------------------------------------------------------------------
 USE_DOCKER=yes
 IPYTHONDIR=/app/.ipython
-FRONTEND_URL="http://localhost:3000"
+FRONTEND_URL="http://localhost:5173"
 # Redis
 # ------------------------------------------------------------------------------
 REDIS_URL=redis://redis:6379/0
