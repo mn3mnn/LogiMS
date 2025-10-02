@@ -15,6 +15,11 @@ Moved to [settings](https://cookiecutter-django.readthedocs.io/en/latest/1-getti
 - https://cookiecutter-django.readthedocs.io/en/latest/2-local-development/developing-locally-docker.html
 
 <br>
+
+- run seeders
+    ``` docker compose -f docker-compose.local.yml run --rm django python manage.py seed_drivers```
+
+<br>
 <br>
 <br>
 <br>
