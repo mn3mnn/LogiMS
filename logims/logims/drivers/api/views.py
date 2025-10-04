@@ -1,4 +1,4 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from ..models import (
     Driver,
@@ -22,9 +22,22 @@ from .serializers import (
             name="company_code", description="Filter drivers by company code", required=False,
             type=str, location=OpenApiParameter.QUERY,
         ),
+        OpenApiParameter(
+            name="search", description="Search drivers by name, phone number, national ID number, or uuid", required=False,
+            type=str, location=OpenApiParameter.QUERY,
+        ),
     ]
 )
 class DriverViewSet(viewsets.ModelViewSet):
+    filter_backends = [filters.SearchFilter]
+    search_fields = [
+        "first_name",
+        "last_name",
+        "phone_number",
+        "nid",
+        "uuid",
+    ]
+
     def get_queryset(self):
         qs = (
             Driver.objects
