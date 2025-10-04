@@ -28,7 +28,7 @@ class DriverViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = (
             Driver.objects
-            .select_related("company", "license", "vehicle_license")
+            .select_related("company", "license", "vehicle_license", "national_id_doc")
             .prefetch_related("contracts")
         )
         company_code = self.request.query_params.get("company_code")
