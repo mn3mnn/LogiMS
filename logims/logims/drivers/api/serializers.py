@@ -5,7 +5,7 @@ from ..models import Driver, DriverNationalID, DriverContract, DriverLicense, Dr
 
 
 class BaseDocumentSerializer(serializers.ModelSerializer):
-    driver_id = serializers.IntegerField(write_only=True)
+    driver_id = serializers.IntegerField()
 
     class Meta:
         fields = ["id", "driver_id", "file", "notes", "issue_date", "expiry_date"]
