@@ -73,7 +73,7 @@ class DriverSerializer(serializers.ModelSerializer):
     class Meta:
         model = Driver
         fields = [
-            "id", "first_name", "last_name", "uuid", "phone_number",
+            "id", "first_name", "last_name", "nid", "uuid", "phone_number",
             "is_active", "company_code", "company_name",
             "contracts", "license", "national_id_doc", "vehicle_license",
             "created_at", "updated_at",
@@ -86,7 +86,7 @@ class DriverCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Driver
         fields = [
-            "first_name", "last_name", "uuid", "phone_number",
+            "first_name", "last_name", "nid", "uuid", "phone_number",
             "is_active", "company_code",
         ]
 

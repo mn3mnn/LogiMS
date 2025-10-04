@@ -7,7 +7,8 @@ from .utils import driver_document_path
 class Driver(models.Model):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    uuid = models.CharField(max_length=100, unique=True)
+    nid = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    uuid = models.CharField(max_length=100, null=True, blank=True)
     phone_number = models.CharField(max_length=20)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")

@@ -34,12 +34,14 @@ class Command(BaseCommand):
             last_name = fake.last_name()
             phone_number = fake.msisdn()
             driver_uuid = str(uuid.uuid4())
+            driver_nid = str(uuid.uuid4())[0:15]
             company = random.choice(companies) if companies and random.random() < 0.8 else None
 
             driver = Driver.objects.create(
                 first_name=first_name,
                 last_name=last_name,
                 uuid=driver_uuid,
+                nid=driver_nid,
                 phone_number=phone_number,
                 is_active=True,
                 company=company
