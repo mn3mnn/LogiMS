@@ -4,25 +4,62 @@ from logims.companies.models import Company
 from ..models import Driver, DriverNationalID, DriverContract, DriverLicense, DriverVehicleLicense
 
 
-class DriverContractSerializer(serializers.ModelSerializer):
+class BaseDocumentSerializer(serializers.ModelSerializer):
+    driver_id = serializers.IntegerField(write_only=True)
+
     class Meta:
+        fields = ["id", "driver_id", "file", "notes", "issue_date", "expiry_date"]
+        abstract = True
+
+    def validate_driver_id(self, value):
+        """Check that the driver exists."""
+        if not Driver.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Driver with this ID does not exist.")
+        return value
+
+    def create(self, validated_data):
+        """Attach the driver to the document before saving."""
+        driver_id = validated_data.pop("driver_id")
+        driver = Driver.objects.get(id=driver_id)
+        return self.Meta.model.objects.create(driver=driver, **validated_data)
+
+
+class DriverContractSerializer(BaseDocumentSerializer):
+    class Meta(BaseDocumentSerializer.Meta):
         model = DriverContract
-        fields = ["id", "file", "notes", "issue_date", "expiry_date", "contract_number"]
+        fields = BaseDocumentSerializer.Meta.fields + ["contract_number"]
 
-class DriverLicenseSerializer(serializers.ModelSerializer):
-    class Meta:
+
+class DriverLicenseSerializer(BaseDocumentSerializer):
+    class Meta(BaseDocumentSerializer.Meta):
         model = DriverLicense
-        fields = ["id", "file", "notes", "issue_date", "expiry_date", "license_number", "license_type"]
+        fields = BaseDocumentSerializer.Meta.fields + ["license_number", "license_type"]
 
-class DriverNationalIDSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DriverNationalID
-        fields = ["id", "file", "notes", "issue_date", "expiry_date"]
+    def validate_driver_id(self, value):
+        value = super().validate_driver_id(value)
+        if DriverLicense.objects.filter(driver_id=value).exists():
+            raise serializers.ValidationError("A license already exists for this driver.")
+        return value
 
-class DriverVehicleLicenseSerializer(serializers.ModelSerializer):
-    class Meta:
+
+class DriverVehicleLicenseSerializer(BaseDocumentSerializer):
+    class Meta(BaseDocumentSerializer.Meta):
         model = DriverVehicleLicense
-        fields = ["id", "file", "notes", "issue_date", "expiry_date", "license_number", "license_plate", "license_type", "vehicle_type"]
+        fields = BaseDocumentSerializer.Meta.fields + [
+            "license_number", "license_plate", "license_type", "vehicle_type"
+        ]
+
+    def validate_driver_id(self, value):
+        value = super().validate_driver_id(value)
+        if DriverVehicleLicense.objects.filter(driver_id=value).exists():
+            raise serializers.ValidationError("A vehicle license already exists for this driver.")
+        return value
+
+
+class DriverNationalIDSerializer(BaseDocumentSerializer):
+    class Meta(BaseDocumentSerializer.Meta):
+        model = DriverNationalID
+        fields = BaseDocumentSerializer.Meta.fields
 
 
 class DriverSerializer(serializers.ModelSerializer):
@@ -45,40 +82,22 @@ class DriverSerializer(serializers.ModelSerializer):
 
 class DriverCreateUpdateSerializer(serializers.ModelSerializer):
     company_code = serializers.CharField(write_only=True)
-    contracts = DriverContractSerializer(many=True, write_only=True, required=False)
-    license = DriverLicenseSerializer(write_only=True, required=False)
-    national_id_doc = DriverNationalIDSerializer(write_only=True, required=False)
-    vehicle_license = DriverVehicleLicenseSerializer(write_only=True, required=False)
 
     class Meta:
         model = Driver
         fields = [
             "first_name", "last_name", "uuid", "phone_number",
             "is_active", "company_code",
-            "contracts", "license", "national_id_doc", "vehicle_license",
         ]
 
     def create(self, validated_data):
         company_code = validated_data.pop("company_code")
         company = Company.objects.get(code=company_code)
-
-        contracts_data = validated_data.pop("contracts", [])
-        license_data = validated_data.pop("license", None)
-        nid_data = validated_data.pop("national_id_doc", None)
-        vlicense_data = validated_data.pop("vehicle_license", None)
-
         driver = Driver.objects.create(company=company, **validated_data)
-
-        for contract in contracts_data:
-            DriverContract.objects.create(driver=driver, **contract)
-
-        if license_data:
-            DriverLicense.objects.create(driver=driver, **license_data)
-
-        if nid_data:
-            DriverNationalID.objects.create(driver=driver, **nid_data)
-
-        if vlicense_data:
-            DriverVehicleLicense.objects.create(driver=driver, **vlicense_data)
-
         return driver
+
+    def update(self, instance, validated_data):
+        company_code = validated_data.pop("company_code", None)
+        if company_code:
+            instance.company = Company.objects.get(code=company_code)
+        return super().update(instance, validated_data)

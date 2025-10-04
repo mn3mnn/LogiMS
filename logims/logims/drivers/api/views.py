@@ -2,10 +2,18 @@ from rest_framework import viewsets
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from ..models import (
     Driver,
+    DriverContract,
+    DriverLicense,
+    DriverNationalID,
+    DriverVehicleLicense,
 )
 from .serializers import (
     DriverSerializer,
     DriverCreateUpdateSerializer,
+    DriverContractSerializer,
+    DriverLicenseSerializer,
+    DriverNationalIDSerializer,
+    DriverVehicleLicenseSerializer,
 )
 
 @extend_schema(
@@ -20,17 +28,73 @@ class DriverViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = (
             Driver.objects
-            .select_related("company", "license", "vehicle_license")  # joins instead of N+1 queries
-            .prefetch_related("contracts")  # loads contracts in 1 query
+            .select_related("company", "license", "vehicle_license")
+            .prefetch_related("contracts")
         )
-
         company_code = self.request.query_params.get("company_code")
         if company_code:
             qs = qs.filter(company__code=company_code)
-
         return qs
 
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update"]:
             return DriverCreateUpdateSerializer
         return DriverSerializer
+
+
+class BaseDocumentViewSet(viewsets.ModelViewSet):
+    """
+    Base viewset for all driver document endpoints.
+    Provides filtering by driver_id and company_code.
+    """
+
+    filter_params = [
+        OpenApiParameter(
+            name="driver_id", description="Filter by driver ID",
+            required=False, type=int, location=OpenApiParameter.QUERY,
+        ),
+        OpenApiParameter(
+            name="company_code", description="Filter by company code",
+            required=False, type=str, location=OpenApiParameter.QUERY,
+        ),
+    ]
+
+    @extend_schema(parameters=filter_params)
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = self.queryset.select_related("driver__company")
+
+        driver_id = self.request.query_params.get("driver_id")
+        company_code = self.request.query_params.get("company_code")
+
+        if driver_id:
+            qs = qs.filter(driver__id=driver_id)
+        if company_code:
+            qs = qs.filter(driver__company__code=company_code)
+
+        return qs
+
+
+class DriverContractViewSet(BaseDocumentViewSet):
+    queryset = DriverContract.objects.all()
+    serializer_class = DriverContractSerializer
+
+
+class DriverLicenseViewSet(BaseDocumentViewSet):
+    queryset = DriverLicense.objects.all()
+    serializer_class = DriverLicenseSerializer
+
+
+class DriverVehicleLicenseViewSet(BaseDocumentViewSet):
+    queryset = DriverVehicleLicense.objects.all()
+    serializer_class = DriverVehicleLicenseSerializer
+
+
+class DriverNationalIDViewSet(BaseDocumentViewSet):
+    queryset = DriverNationalID.objects.all()
+    serializer_class = DriverNationalIDSerializer
+
+
+
