@@ -1,3 +1,7 @@
+import csv
+from io import StringIO
+from django.http import HttpResponse
+from rest_framework.decorators import action
 from rest_framework import viewsets, filters
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.utils import timezone
@@ -82,6 +86,40 @@ class DriverViewSet(viewsets.ModelViewSet):
             return DriverCreateUpdateSerializer
         return DriverSerializer
 
+    @extend_schema(
+        description="Export drivers as CSV."
+    )
+    @action(detail=False, methods=["get"], url_path="export")
+    def export_drivers(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Prepare CSV data
+        buffer = StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow([
+            "ID", "First Name", "Last Name", "Phone", "NID", "Company",
+            "License Expiry", "Vehicle License Expiry", "National ID Expiry",
+            "Contracts Count"
+        ])
+
+        for driver in queryset:
+            writer.writerow([
+                driver.id,
+                driver.first_name,
+                driver.last_name,
+                driver.phone_number,
+                driver.nid or "",
+                driver.company.name if driver.company else "",
+                driver.license.expiry_date if getattr(driver, "license", None) else "",
+                driver.vehicle_license.expiry_date if getattr(driver, "vehicle_license", None) else "",
+                driver.national_id_doc.expiry_date if getattr(driver, "national_id_doc", None) else "",
+                driver.contracts.count(),
+            ])
+
+        # Create HTTP response
+        response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="drivers_export_{timezone.now().date()}.csv"'
+        return response
 
 class BaseDocumentViewSet(viewsets.ModelViewSet):
     """
