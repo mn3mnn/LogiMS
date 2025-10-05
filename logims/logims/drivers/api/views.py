@@ -1,5 +1,8 @@
 from rest_framework import viewsets, filters
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django.utils import timezone
+from django.db.models import Q
+
 from ..models import (
     Driver,
     DriverContract,
@@ -15,6 +18,8 @@ from .serializers import (
     DriverNationalIDSerializer,
     DriverVehicleLicenseSerializer,
 )
+from ..enums import DriverDocumentsStatus
+
 
 @extend_schema(
     parameters=[
@@ -25,6 +30,10 @@ from .serializers import (
         OpenApiParameter(
             name="search", description="Search drivers by name, phone number, national ID number, or uuid", required=False,
             type=str, location=OpenApiParameter.QUERY,
+        ),
+        OpenApiParameter(
+            name="doc_status", description="Filter by driver documents status", required=False,
+            enum=[status.value for status in DriverDocumentsStatus], type=str, location=OpenApiParameter.QUERY,
         ),
     ]
 )
@@ -47,6 +56,25 @@ class DriverViewSet(viewsets.ModelViewSet):
         company_code = self.request.query_params.get("company_code")
         if company_code:
             qs = qs.filter(company__code=company_code)
+
+        doc_status = self.request.query_params.get("doc_status")
+
+        if doc_status == DriverDocumentsStatus.MISSING_DOCS.value:
+            qs = qs.filter(
+                Q(license__isnull=True) |
+                Q(vehicle_license__isnull=True) |
+                Q(national_id_doc__isnull=True) |
+                Q(contracts__isnull=True)
+            ).distinct()
+
+        elif doc_status == DriverDocumentsStatus.EXPIRED_DOCS.value:
+            qs = qs.filter(
+                Q(license__expiry_date__lt=timezone.now().date()) |
+                Q(vehicle_license__expiry_date__lt=timezone.now().date()) |
+                Q(national_id_doc__expiry_date__lt=timezone.now().date()) |
+                Q(contracts__expiry_date__lt=timezone.now().date())
+            ).distinct()
+
         return qs
 
     def get_serializer_class(self):
