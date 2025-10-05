@@ -42,7 +42,7 @@ from ..enums import DriverDocumentsStatus
     ]
 )
 class DriverViewSet(viewsets.ModelViewSet):
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         "first_name",
         "last_name",
@@ -50,6 +50,8 @@ class DriverViewSet(viewsets.ModelViewSet):
         "nid",
         "uuid",
     ]
+    ordering_fields = ["first_name", "last_name", "created_at", "updated_at", ]
+    ordering = ["updated_at"]  # default ordering
 
     def get_queryset(self):
         qs = (
