@@ -86,7 +86,7 @@ class DriverCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Driver
         fields = [
-            "first_name", "last_name", "nid", "uuid", "phone_number",
+            "id", "first_name", "last_name", "nid", "uuid", "phone_number",
             "is_active", "company_code",
         ]
 
