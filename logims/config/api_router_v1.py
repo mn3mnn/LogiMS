@@ -1,8 +1,9 @@
 from django.conf import settings
 from rest_framework.routers import DefaultRouter
 from rest_framework.routers import SimpleRouter
+from django.urls import path
 
-from logims.users.api.views import UserViewSet
+from logims.users.api.views import UserViewSet, LogoutView
 from logims.drivers.api.views import (
     DriverViewSet,
     DriverContractViewSet,
@@ -25,4 +26,7 @@ router.register(r"companies", CompanyViewSet, basename="companies")
 
 
 app_name = "api"
-urlpatterns = router.urls
+urlpatterns = [
+    *router.urls,
+    path("auth/logout/", LogoutView.as_view(), name="logout")
+]
