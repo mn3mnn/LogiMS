@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .utils import driver_document_path
 
@@ -12,6 +13,14 @@ class Driver(models.Model):
     phone_number = models.CharField(max_length=20)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
+    insurance = models.FloatField(
+        null=True, blank=True, help_text="Insurance amount",
+        validators=[MinValueValidator(0), MaxValueValidator(100000)]
+    )
+    agency_share = models.FloatField(
+        null=True, blank=True, help_text="Agency share as decimal (e.g., 0.1 for 10%)",
+        validators=[MinValueValidator(0), MaxValueValidator(1.0)]
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
