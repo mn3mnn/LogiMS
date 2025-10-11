@@ -16,8 +16,23 @@ Moved to [settings](https://cookiecutter-django.readthedocs.io/en/latest/1-getti
 
 <br>
 
-- run seeders
-    ``` docker compose -f docker-compose.local.yml run --rm django python manage.py seed_drivers```
+
+- Build the Stack
+  - ``` docker compose -f docker-compose.local.yml build ```
+  - ``` docker compose -f docker-compose.local.yml run --rm django uv lock ```
+  - ``` docker compose -f docker-compose.local.yml up --build ```
+
+<br>
+
+- run management commands
+  - ``` docker compose -f docker-compose.local.yml run --rm django python manage.py makemigrations```
+  - ``` docker compose -f docker-compose.local.yml run --rm django python manage.py migrate```
+  - ``` docker compose -f docker-compose.local.yml run --rm django python manage.py createsuperuser```
+
+<br>
+
+- run seeders (for testing only)
+  - ``` docker compose -f docker-compose.local.yml run --rm django python manage.py seed_drivers```
 
 <br>
 <br>
