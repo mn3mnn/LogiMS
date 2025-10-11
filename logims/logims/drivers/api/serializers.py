@@ -8,7 +8,7 @@ class BaseDocumentSerializer(serializers.ModelSerializer):
     driver_id = serializers.IntegerField()
 
     class Meta:
-        fields = ["id", "driver_id", "file", "notes", "issue_date", "expiry_date"]
+        fields = ["id", "driver_id", "file", "notes", "issue_date", "expiry_date", "status"]
         abstract = True
 
     def validate_driver_id(self, value):

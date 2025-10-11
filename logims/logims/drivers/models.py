@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .utils import driver_document_path
+from .enums import DriverDocumentsStatus
 
 
 class Driver(models.Model):
@@ -42,6 +43,20 @@ class Document(models.Model):
     @property
     def is_expired(self):
         return self.expiry_date and self.expiry_date < timezone.now().date()
+
+    @property
+    def status(self):
+        """
+        Get the status of this individual document.
+        Returns DriverDocumentsStatus enum value.
+        """
+        if not self.file:
+            return DriverDocumentsStatus.MISSING
+
+        if self.is_expired:
+            return DriverDocumentsStatus.EXPIRED
+
+        return DriverDocumentsStatus.VALID
 
 class DriverNationalID(Document):
     driver = models.OneToOneField(Driver, on_delete=models.CASCADE, related_name="national_id_doc")
