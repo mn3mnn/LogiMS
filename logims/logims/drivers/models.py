@@ -19,8 +19,8 @@ class Driver(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100000)]
     )
     agency_share = models.FloatField(
-        null=True, blank=True, help_text="Agency share as decimal (e.g., 0.1 for 10%)",
-        validators=[MinValueValidator(0), MaxValueValidator(1.0)]
+        null=True, blank=True, help_text="Agency share as percentage (e.g., 15 for 15%)",
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -36,10 +36,10 @@ class Command(BaseCommand):
             driver_uuid = str(uuid.uuid4())
             driver_nid = str(uuid.uuid4())[0:15]
             company = random.choice(companies) if companies and random.random() < 0.8 else None
-            
+
             # Generate realistic insurance and agency share values
             insurance = round(random.uniform(50.0, 500.0), 2)  # Insurance between €50-€500
-            agency_share = round(random.uniform(0.05, 0.25), 3)  # Agency share between 0.05-0.25 (5%-25%)
+            agency_share = round(random.uniform(5.0, 50.0), 2)  # Agency share
 
             driver = Driver.objects.create(
                 first_name=first_name,
