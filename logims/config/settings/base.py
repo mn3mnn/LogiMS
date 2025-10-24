@@ -79,6 +79,7 @@ THIRD_PARTY_APPS = [
     "allauth.mfa",
     "allauth.socialaccount",
     "django_celery_beat",
+    "django_filters",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
@@ -90,6 +91,7 @@ LOCAL_APPS = [
     "logims.companies",
     "logims.drivers",
     "logims.orders",
+    "logims.data_imports",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
