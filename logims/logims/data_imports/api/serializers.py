@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.files.uploadedfile import UploadedFile
 from ..models import FileUpload, PaymentRecord, TripRecord
+from logims.drivers.models import Driver
 from ..processors.factory import ProcessorFactory
 
 
@@ -92,11 +93,12 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
 
     driver_name = serializers.SerializerMethodField()
     company_name = serializers.CharField(source='file_upload.company.name', read_only=True)
+    driver_id = serializers.SerializerMethodField()
 
     class Meta:
         model = PaymentRecord
         fields = [
-            'id', 'file_upload', 'company_name', 'driver_uuid', 'driver_name',
+            'id', 'file_upload', 'company_name', 'driver_uuid', 'driver_id', 'driver_name',
             'driver_first_name', 'driver_last_name', 'total_revenue', 'net_fare',
             'promotions', 'refunds_and_fees', 'payouts', 'bank_transfer',
             'cash_collected', 'fare_tax', 'tips', 'taxes', 'other_revenue',
@@ -107,6 +109,13 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
     def get_driver_name(self, obj):
         """Get full driver name"""
         return f"{obj.driver_first_name} {obj.driver_last_name}"
+
+    def get_driver_id(self, obj):
+        """Resolve internal Driver id by driver_uuid if available."""
+        if not obj.driver_uuid:
+            return None
+        driver = Driver.objects.filter(uuid=obj.driver_uuid).only('id').first()
+        return driver.id if driver else None
 
 
 class TripRecordSerializer(serializers.ModelSerializer):
