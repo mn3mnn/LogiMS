@@ -11,6 +11,8 @@ class Driver(models.Model):
     last_name = models.CharField(max_length=255)
     nid = models.CharField(max_length=100, unique=True, null=True, blank=True)
     uuid = models.CharField(max_length=100, null=True, blank=True)
+    email = models.EmailField(max_length=255, null=True, blank=True)
+    reports_to = models.CharField(max_length=255, null=True, blank=True)
     phone_number = models.CharField(max_length=20)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
