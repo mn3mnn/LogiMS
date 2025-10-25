@@ -57,12 +57,13 @@ class FileUploadListSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     file_type_display = serializers.CharField(source='get_file_type_display', read_only=True)
     file_name = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = FileUpload
         fields = [
             'id', 'company', 'company_name', 'file_type', 'file_type_display',
-            'file_name', 'from_date', 'to_date', 'status', 'status_display',
+            'file_name', 'file_url', 'from_date', 'to_date', 'status', 'status_display',
             'processed_records_count', 'created_at'
         ]
 
@@ -70,6 +71,19 @@ class FileUploadListSerializer(serializers.ModelSerializer):
         """Get just the filename without path"""
         if obj.file:
             return obj.file.name.split('/')[-1]
+        return None
+
+    def get_file_url(self, obj):
+        """Absolute or relative URL to the uploaded file"""
+        try:
+            request = self.context.get('request')
+        except Exception:
+            request = None
+        if obj.file:
+            url = obj.file.url
+            if request:
+                return request.build_absolute_uri(url)
+            return url
         return None
 
 
