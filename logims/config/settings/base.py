@@ -79,6 +79,7 @@ THIRD_PARTY_APPS = [
     "allauth.mfa",
     "allauth.socialaccount",
     "django_celery_beat",
+    "django_filters",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
@@ -90,6 +91,7 @@ LOCAL_APPS = [
     "logims.companies",
     "logims.drivers",
     "logims.orders",
+    "logims.data_imports",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -149,6 +151,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
 
 # STATIC
 # ------------------------------------------------------------------------------
@@ -345,10 +351,14 @@ REST_FRAMEWORK = {
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
-CORS_URLS_REGEX = r"^/api/.*$"
-CORS_ALLOWED_ORIGINS = [
-    env('FRONTEND_URL'),
-]
+# CORS_URLS_REGEX = r"^/api/.*$"
+# CORS_ALLOWED_ORIGINS = [
+#     env('FRONTEND_URL'),
+# ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
 
 # By Default swagger ui is available only to admin user(s). You can change permission classes to change that
 # See more configuration options at https://drf-spectacular.readthedocs.io/en/latest/settings.html#settings

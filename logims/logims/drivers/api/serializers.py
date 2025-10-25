@@ -8,7 +8,7 @@ class BaseDocumentSerializer(serializers.ModelSerializer):
     driver_id = serializers.IntegerField()
 
     class Meta:
-        fields = ["id", "driver_id", "file", "notes", "issue_date", "expiry_date"]
+        fields = ["id", "driver_id", "file", "notes", "issue_date", "expiry_date", "status"]
         abstract = True
 
     def validate_driver_id(self, value):
@@ -74,7 +74,7 @@ class DriverSerializer(serializers.ModelSerializer):
         model = Driver
         fields = [
             "id", "first_name", "last_name", "nid", "uuid", "phone_number",
-            "is_active", "company_code", "company_name",
+            "is_active", "company_code", "company_name", "insurance", "agency_share",
             "contracts", "license", "national_id_doc", "vehicle_license",
             "created_at", "updated_at",
         ]
@@ -87,7 +87,7 @@ class DriverCreateUpdateSerializer(serializers.ModelSerializer):
         model = Driver
         fields = [
             "id", "first_name", "last_name", "nid", "uuid", "phone_number",
-            "is_active", "company_code",
+            "is_active", "company_code", "insurance", "agency_share",
         ]
 
     def create(self, validated_data):

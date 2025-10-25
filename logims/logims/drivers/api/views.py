@@ -65,7 +65,7 @@ class DriverViewSet(viewsets.ModelViewSet):
 
         doc_status = self.request.query_params.get("doc_status")
 
-        if doc_status == DriverDocumentsStatus.MISSING_DOCS.value:
+        if doc_status == DriverDocumentsStatus.MISSING.value:
             qs = qs.filter(
                 Q(license__isnull=True) |
                 Q(vehicle_license__isnull=True) |
@@ -73,12 +73,30 @@ class DriverViewSet(viewsets.ModelViewSet):
                 Q(contracts__isnull=True)
             ).distinct()
 
-        elif doc_status == DriverDocumentsStatus.EXPIRED_DOCS.value:
+        elif doc_status == DriverDocumentsStatus.EXPIRED.value:
             qs = qs.filter(
                 Q(license__expiry_date__lt=timezone.now().date()) |
                 Q(vehicle_license__expiry_date__lt=timezone.now().date()) |
                 Q(national_id_doc__expiry_date__lt=timezone.now().date()) |
                 Q(contracts__expiry_date__lt=timezone.now().date())
+            ).distinct()
+
+        elif doc_status == DriverDocumentsStatus.VALID.value:
+            # Valid documents: all required docs exist and none are expired
+            today = timezone.now().date()
+            qs = qs.filter(
+                # All required documents exist
+                license__isnull=False,
+                vehicle_license__isnull=False,
+                national_id_doc__isnull=False,
+                contracts__isnull=False,
+                # None are expired
+                license__expiry_date__gte=today,
+                vehicle_license__expiry_date__gte=today,
+                national_id_doc__expiry_date__gte=today,
+            ).exclude(
+                # Exclude if any contracts are expired
+                contracts__expiry_date__lt=today
             ).distinct()
 
         return qs

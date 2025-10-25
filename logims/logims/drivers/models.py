@@ -1,7 +1,9 @@
 from django.db import models
 from django.utils import timezone
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .utils import driver_document_path
+from .enums import DriverDocumentsStatus
 
 
 class Driver(models.Model):
@@ -12,6 +14,14 @@ class Driver(models.Model):
     phone_number = models.CharField(max_length=20)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
+    insurance = models.FloatField(
+        null=True, blank=True, help_text="Insurance amount",
+        validators=[MinValueValidator(0), MaxValueValidator(100000)]
+    )
+    agency_share = models.FloatField(
+        null=True, blank=True, help_text="Agency share as percentage (e.g., 15 for 15%)",
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -33,6 +43,20 @@ class Document(models.Model):
     @property
     def is_expired(self):
         return self.expiry_date and self.expiry_date < timezone.now().date()
+
+    @property
+    def status(self):
+        """
+        Get the status of this individual document.
+        Returns DriverDocumentsStatus enum value.
+        """
+        if not self.file:
+            return DriverDocumentsStatus.MISSING
+
+        if self.is_expired:
+            return DriverDocumentsStatus.EXPIRED
+
+        return DriverDocumentsStatus.VALID
 
 class DriverNationalID(Document):
     driver = models.OneToOneField(Driver, on_delete=models.CASCADE, related_name="national_id_doc")
