@@ -14,6 +14,7 @@ class FileUploadFilterSet(filters.FilterSet):
     class Meta:
         model = FileUpload
         fields = {
+            "id": ["exact"],
             "company": ["exact"],
             "file_type": ["exact"],
             "status": ["exact"],
