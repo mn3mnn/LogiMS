@@ -7,6 +7,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from logims.drivers.models import Driver
+from django.db.models.functions import TruncDay
 
 from ..models import FileUpload, PaymentRecord, TripRecord
 from ..processors.factory import ProcessorFactory
@@ -93,6 +95,18 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             'processing_status': processing_status
         }, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Basic stats: counts by status and file_type"""
+        from django.db.models import Count
+        qs = self.filter_queryset(self.get_queryset())
+        by_status = qs.values('status').annotate(count=Count('id')).order_by()
+        by_type = qs.values('file_type').annotate(count=Count('id')).order_by()
+        return Response({
+            'by_status': list(by_status),
+            'by_type': list(by_type),
+            'total': qs.count(),
+        })
 
 @extend_schema(
     parameters=[
@@ -133,12 +147,131 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
             total_records=Count('id'),
             total_revenue=Sum('total_revenue'),
             total_payouts=Sum('payouts'),
-            total_net_earnings=Sum('final_net_earnings'),
-            avg_revenue=Avg('total_revenue'),
-            avg_payouts=Avg('payouts')
+            total_net_earnings=Sum('final_net_earnings')
         )
 
         return Response(summary)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Top companies by totals and counts"""
+        from django.db.models import Sum, Count
+        qs = self.filter_queryset(self.get_queryset())
+        top_companies = (
+            qs.values('file_upload__company__name')
+            .annotate(
+                total_net=Sum('final_net_earnings'),
+                total_revenue=Sum('total_revenue'),
+                records=Count('id'),
+            )
+            .order_by('-total_net')[:5]
+        )
+        return Response({
+            'top_companies': list(top_companies),
+            'total_records': qs.count(),
+        })
+
+    @action(detail=False, methods=['get'])
+    def timeseries(self, request):
+        """Time series for revenue/net/payouts.
+        Params:
+          - segments=true: collapse contiguous daily data into ranges; gap_days (default 3)
+          - monthly=auto: if a contiguous range fully covers a calendar month, collapse to monthly point
+        """
+        from django.db.models import Sum
+        import datetime, calendar
+        qs = self.filter_queryset(self.get_queryset())
+        # Upload-period aggregation mode
+        if request.query_params.get('period') == 'upload':
+            series = (
+                qs.values('file_upload_id', 'file_upload__from_date', 'file_upload__to_date', 'file_upload__company__name')
+                .annotate(
+                    total_net=Sum('final_net_earnings'),
+                    total_revenue=Sum('total_revenue'),
+                    total_payouts=Sum('payouts'),
+                )
+                .order_by('file_upload__from_date')
+            )
+            # normalize keys
+            result = []
+            for row in series:
+                result.append({
+                    'upload_id': row['file_upload_id'],
+                    'from_date': row['file_upload__from_date'],
+                    'to_date': row['file_upload__to_date'],
+                    'company': row['file_upload__company__name'],
+                    'total_net': row['total_net'],
+                    'total_revenue': row['total_revenue'],
+                    'total_payouts': row['total_payouts'],
+                })
+            return Response(result)
+
+        series = (
+            qs.annotate(day=TruncDay('file_upload__from_date'))
+            .values('day')
+            .annotate(
+                total_net=Sum('final_net_earnings'),
+                total_revenue=Sum('total_revenue'),
+                total_payouts=Sum('payouts'),
+            )
+            .order_by('day')
+        )
+        segments = request.query_params.get('segments') == 'true'
+        monthly = request.query_params.get('monthly') == 'auto'
+        if not segments:
+            return Response(list(series))
+
+        gap_days = int(request.query_params.get('gap_days') or 3)
+        # Build contiguous segments
+        items = list(series)
+        out = []
+        current = None
+        prev_day = None
+        days_in_segment = set()
+        for row in items:
+            day = row['day'].date() if hasattr(row['day'], 'date') else row['day']
+            if prev_day is None or (day - prev_day).days >= gap_days:
+                # finalize previous
+                if current:
+                    # monthly collapse if eligible
+                    if monthly:
+                        start = current['start']
+                        end = current['end']
+                        if start.day == 1 and start.month == end.month and start.year == end.year:
+                            _, mdays = calendar.monthrange(start.year, start.month)
+                            if (end.day == mdays) and (len(days_in_segment) == mdays):
+                                current['period_type'] = 'month'
+                                current['month'] = start.strftime('%Y-%m')
+                    out.append(current)
+                # start new
+                current = {
+                    'start': day,
+                    'end': day,
+                    'total_net': row['total_net'] or 0,
+                    'total_revenue': row['total_revenue'] or 0,
+                    'total_payouts': row['total_payouts'] or 0,
+                    'period_type': 'range',
+                }
+                days_in_segment = {day}
+            else:
+                # extend
+                current['end'] = day
+                current['total_net'] += row['total_net'] or 0
+                current['total_revenue'] += row['total_revenue'] or 0
+                current['total_payouts'] += row['total_payouts'] or 0
+                days_in_segment.add(day)
+            prev_day = day
+        if current:
+            if monthly:
+                start = current['start']
+                end = current['end']
+                if start.day == 1 and start.month == end.month and start.year == end.year:
+                    _, mdays = calendar.monthrange(start.year, start.month)
+                    if (end.day == mdays) and (len(days_in_segment) == mdays):
+                        current['period_type'] = 'month'
+                        current['month'] = start.strftime('%Y-%m')
+            out.append(current)
+        return Response(out)
 
 
 class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
@@ -163,10 +296,123 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
         summary = queryset.aggregate(
             total_trips=Count('id'),
             total_fare_amount=Sum('fare_amount'),
-            total_distance=Sum('trip_distance'),
-            avg_fare=Avg('fare_amount'),
-            avg_distance=Avg('trip_distance'),
-            avg_duration=Avg('trip_duration_minutes')
+            total_distance=Sum('trip_distance')
         )
 
         return Response(summary)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Counts by status and service type for trips"""
+        from django.db.models import Count, Sum
+        qs = self.filter_queryset(self.get_queryset())
+        by_status = qs.values('trip_status').annotate(count=Count('id')).order_by()
+        by_service = qs.values('service_type').annotate(count=Count('id')).order_by()
+        top_drivers_qs = (
+            qs.values('driver_uuid', 'driver_first_name', 'driver_last_name')
+            .annotate(
+                trips=Count('id'),
+                fare=Sum('fare_amount'),
+            )
+            .order_by('-fare')[:3]
+        )
+        top_drivers = list(top_drivers_qs)
+        # Map driver_uuid -> driver_id
+        uuids = [d['driver_uuid'] for d in top_drivers if d.get('driver_uuid')]
+        uuid_to_id = {
+            row['uuid']: row['id']
+            for row in Driver.objects.filter(uuid__in=uuids).values('uuid', 'id')
+        }
+        for d in top_drivers:
+            d['driver_id'] = uuid_to_id.get(d.get('driver_uuid'))
+        return Response({
+            'by_status': list(by_status),
+            'by_service_type': list(by_service),
+            'top_drivers': top_drivers,
+            'total': qs.count(),
+        })
+
+    @action(detail=False, methods=['get'])
+    def timeseries(self, request):
+        """Trips per day and fare sum. Supports segments and monthly=auto (see payments)."""
+        from django.db.models import Sum, Count
+        import datetime, calendar
+        qs = self.filter_queryset(self.get_queryset())
+        if request.query_params.get('period') == 'upload':
+            series = (
+                qs.values('file_upload_id', 'file_upload__from_date', 'file_upload__to_date', 'file_upload__company__name')
+                .annotate(
+                    trips=Count('id'),
+                    fare=Sum('fare_amount'),
+                )
+                .order_by('file_upload__from_date')
+            )
+            result = []
+            for row in series:
+                result.append({
+                    'upload_id': row['file_upload_id'],
+                    'from_date': row['file_upload__from_date'],
+                    'to_date': row['file_upload__to_date'],
+                    'company': row['file_upload__company__name'],
+                    'trips': row['trips'],
+                    'fare': row['fare'],
+                })
+            return Response(result)
+        series = (
+            qs.annotate(day=TruncDay('order_time'))
+            .values('day')
+            .annotate(
+                trips=Count('id'),
+                fare=Sum('fare_amount'),
+            )
+            .order_by('day')
+        )
+        segments = request.query_params.get('segments') == 'true'
+        monthly = request.query_params.get('monthly') == 'auto'
+        if not segments:
+            return Response(list(series))
+
+        gap_days = int(request.query_params.get('gap_days') or 3)
+        items = list(series)
+        out = []
+        current = None
+        prev_day = None
+        days_in_segment = set()
+        for row in items:
+            day = row['day'].date() if hasattr(row['day'], 'date') else row['day']
+            if prev_day is None or (day - prev_day).days >= gap_days:
+                if current:
+                    if monthly:
+                        start = current['start']
+                        end = current['end']
+                        if start.day == 1 and start.month == end.month and start.year == end.year:
+                            _, mdays = calendar.monthrange(start.year, start.month)
+                            if (end.day == mdays) and (len(days_in_segment) == mdays):
+                                current['period_type'] = 'month'
+                                current['month'] = start.strftime('%Y-%m')
+                    out.append(current)
+                current = {
+                    'start': day,
+                    'end': day,
+                    'trips': row['trips'] or 0,
+                    'fare': row['fare'] or 0,
+                    'period_type': 'range',
+                }
+                days_in_segment = {day}
+            else:
+                current['end'] = day
+                current['trips'] += row['trips'] or 0
+                current['fare'] += row['fare'] or 0
+                days_in_segment.add(day)
+            prev_day = day
+        if current:
+            if monthly:
+                start = current['start']
+                end = current['end']
+                if start.day == 1 and start.month == end.month and start.year == end.year:
+                    _, mdays = calendar.monthrange(start.year, start.month)
+                    if (end.day == mdays) and (len(days_in_segment) == mdays):
+                        current['period_type'] = 'month'
+                        current['month'] = start.strftime('%Y-%m')
+            out.append(current)
+        return Response(out)
