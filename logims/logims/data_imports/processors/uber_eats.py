@@ -60,22 +60,27 @@ class UberEatsProcessor(BaseExcelProcessor):
     def _process_trips(self, df: pd.DataFrame) -> int:
         """Process Uber Eats trip data"""
         records_created = 0
+        records_updated = 0
 
         with transaction.atomic():
-            # Clear existing records for this file upload
-            TripRecord.objects.filter(file_upload=self.file_upload).delete()
-
             for _, row in df.iterrows():
                 trip_data = self._map_trip_data(row)
                 trip_data = self._calculate_trip_fields(trip_data)
 
-                TripRecord.objects.create(
-                    file_upload=self.file_upload,
-                    **trip_data
-                )
-                records_created += 1
+                trip_uuid = trip_data.pop('trip_uuid')
 
-        return records_created
+                rec, is_created = TripRecord.upsert_trip_record(
+                    file_upload=self.file_upload,
+                    trip_uuid=trip_uuid,
+                    trip_data=trip_data
+                )
+
+                if is_created:
+                    records_created += 1
+                else:
+                    records_updated += 1
+
+        return records_created + records_updated
 
     def _map_payment_data(self, row: pd.Series) -> Dict[str, Any]:
         """Map Uber Eats payment Excel row to PaymentRecord fields"""

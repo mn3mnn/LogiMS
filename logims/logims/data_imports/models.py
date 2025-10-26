@@ -197,7 +197,7 @@ class TripRecord(models.Model):
         on_delete=models.CASCADE,
         related_name="trip_records"
     )
-    trip_uuid = models.CharField(max_length=100, db_index=True)
+    trip_uuid = models.CharField(max_length=100, db_index=True, unique=True)
     driver_uuid = models.CharField(max_length=100, db_index=True)
     driver_first_name = models.CharField(max_length=255)
     driver_last_name = models.CharField(max_length=255)
@@ -229,7 +229,26 @@ class TripRecord(models.Model):
             models.Index(fields=['file_upload']),
             models.Index(fields=['order_time']),
         ]
-        unique_together = ['file_upload', 'trip_uuid']
 
     def __str__(self):
         return f"Trip {self.trip_uuid} - {self.driver_first_name} {self.driver_last_name}"
+
+    @classmethod
+    def upsert_trip_record(cls, file_upload, trip_uuid, trip_data):
+        """Create or update a trip record by unique trip_uuid.
+        On update, also re-associate the record to the latest file_upload.
+        """
+        existing = cls.objects.filter(trip_uuid=trip_uuid).first()
+        if existing:
+            # update fields
+            for field, value in trip_data.items():
+                setattr(existing, field, value)
+            # ensure association reflects latest upload
+            existing.file_upload = file_upload
+            existing.save()
+            return existing, False
+        else:
+            trip_data['file_upload'] = file_upload
+            trip_data['trip_uuid'] = trip_uuid
+            new_rec = cls.objects.create(**trip_data)
+            return new_rec, True
