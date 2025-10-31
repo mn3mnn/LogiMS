@@ -1,0 +1,26 @@
+Document Expiration Warning - {{ doc_type_display }}
+
+Dear {% if driver.email %}{{ driver.first_name }} {{ driver.last_name }}{% else %}Administrator{% endif %},
+
+This is a reminder that the following document will expire soon:
+
+Driver: {{ driver.first_name }} {{ driver.last_name }}
+{% if driver.nid %}National ID: {{ driver.nid }}{% endif %}
+{% if driver.phone_number %}Phone: {{ driver.phone_number }}{% endif %}
+{% if company %}Company: {{ company.name }}{% endif %}
+
+Document Type: {{ doc_type_display }}
+Expiry Date: {{ expiry_date|date:"F d, Y" }}
+Days Until Expiration: {{ days_until_expiry }} day{% if days_until_expiry != 1 %}s{% endif %}
+
+Please ensure the document is renewed before the expiration date to avoid service interruptions.
+
+{% if driver.email %}
+If you have already renewed this document, please update it in the system.
+{% else %}
+Please contact the driver to ensure they renew this document promptly.
+{% endif %}
+
+Thank you,
+LogiMS Team
+

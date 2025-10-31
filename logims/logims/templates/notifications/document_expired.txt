@@ -1,0 +1,29 @@
+URGENT: Document Expired - {{ doc_type_display }}
+
+Dear {% if driver.email %}{{ driver.first_name }} {{ driver.last_name }}{% else %}Administrator{% endif %},
+
+This is an urgent notification that the following document has EXPIRED:
+
+Driver: {{ driver.first_name }} {{ driver.last_name }}
+{% if driver.nid %}National ID: {{ driver.nid }}{% endif %}
+{% if driver.phone_number %}Phone: {{ driver.phone_number }}{% endif %}
+{% if company %}Company: {{ company.name }}{% endif %}
+
+Document Type: {{ doc_type_display }}
+Expiry Date: {{ expiry_date|date:"F d, Y" }}
+Days Since Expiration: {{ days_since_expired }} day{% if days_since_expired != 1 %}s{% endif %}
+
+IMMEDIATE ACTION REQUIRED:
+
+This expired document may affect the driver's ability to work and could have legal implications.
+Please renew and update the document immediately.
+
+{% if driver.email %}
+Please renew this document as soon as possible and update it in the system.
+{% else %}
+Please contact the driver immediately to ensure they renew this document.
+{% endif %}
+
+Thank you,
+LogiMS Team
+

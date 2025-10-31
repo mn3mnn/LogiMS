@@ -13,3 +13,13 @@ REDIS_URL=redis://redis:6379/0
 # Flower
 CELERY_FLOWER_USER=debug
 CELERY_FLOWER_PASSWORD=debug
+
+# Email Configuration - Hostinger
+# ------------------------------------------------------------------------------
+DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.hostinger.com
+EMAIL_PORT=465
+EMAIL_USE_SSL=True
+EMAIL_HOST_USER=admin@kresh-gmbh.de
+EMAIL_HOST_PASSWORD=
+DEFAULT_FROM_EMAIL=admin@kresh-gmbh.de
