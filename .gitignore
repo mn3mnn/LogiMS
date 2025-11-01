@@ -152,6 +152,15 @@ ENV/
 env.bak/
 venv.bak/
 
+# Ignore all files inside .envs subfolders
+logims/.envs/*/*
+
+# Keep the folder structure so Git can reach .example files
+!logims/.envs/
+!logims/.envs/*/
+# Don't ignore .example files
+!logims/.envs/*/*.example
+
 # Spyder project settings
 .spyderproject
 .spyproject
