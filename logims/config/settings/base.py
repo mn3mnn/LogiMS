@@ -143,6 +143,7 @@ AUTH_PASSWORD_VALIDATORS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "logims.contrib.middleware.RequestLoggingMiddleware",  # Custom request logging
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -151,6 +152,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "logims.contrib.middleware.PerformanceLoggingMiddleware",  # Performance logging
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -273,17 +275,124 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
-            "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
+            "format": "%(levelname)s %(asctime)s %(name)s %(module)s %(process)d %(thread)d %(message)s",
+        },
+        "simple": {
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
+        },
+        # JSON formatter (requires python-json-logger package)
+        # Uncomment to enable structured JSON logging:
+        # "json": {
+        #     "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+        #     "format": "%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d",
+        # },
+    },
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse",
+        },
+        "require_debug_true": {
+            "()": "django.utils.log.RequireDebugTrue",
         },
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "console_debug": {
+            "level": "DEBUG",
+            "filters": ["require_debug_true"],
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+        "file_general": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "logims.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "file_errors": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "errors.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "file_requests": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "requests.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "file_celery": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "celery.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
     },
-    "root": {"level": "INFO", "handlers": ["console"]},
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file_general"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "file_errors", "file_requests"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console", "file_requests"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["console_debug"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "celery": {
+            "handlers": ["console", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims": {
+            "handlers": ["console", "file_general", "file_errors"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.drivers": {
+            "handlers": ["console", "file_general"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.data_imports": {
+            "handlers": ["console", "file_general", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.users": {
+            "handlers": ["console", "file_general"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.notifications": {
+            "handlers": ["console", "file_general"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+    "root": {"level": "INFO", "handlers": ["console", "file_general"]},
 }
 
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")

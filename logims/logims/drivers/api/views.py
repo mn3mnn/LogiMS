@@ -1,4 +1,5 @@
 import csv
+import logging
 from io import StringIO
 from django.http import HttpResponse
 from rest_framework.decorators import action
@@ -23,6 +24,9 @@ from .serializers import (
     DriverVehicleLicenseSerializer,
 )
 from ..enums import DriverDocumentsStatus
+from logims.contrib.logging_utils import log_api_call, log_model_change, log_error
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(
@@ -62,10 +66,13 @@ class DriverViewSet(viewsets.ModelViewSet):
             .prefetch_related("contracts")
         )
         company_code = self.request.query_params.get("company_code")
+        doc_status = self.request.query_params.get("doc_status")
+
+        filters_applied = []
+
         if company_code:
             qs = qs.filter(company__code=company_code)
-
-        doc_status = self.request.query_params.get("doc_status")
+            filters_applied.append(f"company_code={company_code}")
 
         if doc_status == DriverDocumentsStatus.MISSING.value:
             qs = qs.filter(
@@ -74,6 +81,7 @@ class DriverViewSet(viewsets.ModelViewSet):
                 Q(national_id_doc__isnull=True) |
                 Q(contracts__isnull=True)
             ).distinct()
+            filters_applied.append("doc_status=MISSING")
 
         elif doc_status == DriverDocumentsStatus.EXPIRED.value:
             qs = qs.filter(
@@ -82,6 +90,7 @@ class DriverViewSet(viewsets.ModelViewSet):
                 Q(national_id_doc__expiry_date__lt=timezone.now().date()) |
                 Q(contracts__expiry_date__lt=timezone.now().date())
             ).distinct()
+            filters_applied.append("doc_status=EXPIRED")
 
         elif doc_status == DriverDocumentsStatus.VALID.value:
             # Valid documents: all required docs exist and none are expired
@@ -100,6 +109,16 @@ class DriverViewSet(viewsets.ModelViewSet):
                 # Exclude if any contracts are expired
                 contracts__expiry_date__lt=today
             ).distinct()
+            filters_applied.append("doc_status=VALID")
+
+        if filters_applied:
+            try:
+                logger.debug(
+                    f"Driver queryset filters applied | user={self.request.user.username} | "
+                    f"filters=[{', '.join(filters_applied)}]"
+                )
+            except Exception:
+                pass  # Don't break queryset if logging fails
 
         return qs
 
@@ -108,40 +127,130 @@ class DriverViewSet(viewsets.ModelViewSet):
             return DriverCreateUpdateSerializer
         return DriverSerializer
 
+    def perform_create(self, serializer):
+        """Log driver creation."""
+        driver = serializer.save()
+        # Utility function is already safe via @_safe_log decorator
+        log_model_change(
+            action="create",
+            model_name="Driver",
+            instance_id=driver.id,
+            user=self.request.user,
+            first_name=driver.first_name,
+            last_name=driver.last_name,
+            company=driver.company.name if driver.company else None
+        )
+        # Direct logger call needs protection
+        try:
+            logger.info(
+                f"Driver created | id={driver.id} | name={driver.first_name} {driver.last_name} | "
+                f"user={self.request.user.username}"
+            )
+        except Exception:
+            pass
+
+    def perform_update(self, serializer):
+        """Log driver update."""
+        driver = serializer.save()
+        # Utility function is already safe via @_safe_log decorator
+        log_model_change(
+            action="update",
+            model_name="Driver",
+            instance_id=driver.id,
+            user=self.request.user,
+            first_name=driver.first_name,
+            last_name=driver.last_name
+        )
+        # Direct logger call needs protection
+        try:
+            logger.info(
+                f"Driver updated | id={driver.id} | name={driver.first_name} {driver.last_name} | "
+                f"user={self.request.user.username}"
+            )
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        """Log driver deletion."""
+        driver_id = instance.id
+        driver_name = f"{instance.first_name} {instance.last_name}"
+
+        # Utility function is already safe via @_safe_log decorator
+        log_model_change(
+            action="delete",
+            model_name="Driver",
+            instance_id=driver_id,
+            user=self.request.user,
+            name=driver_name
+        )
+        # Direct logger call needs protection
+        try:
+            logger.warning(
+                f"Driver deleted | id={driver_id} | name={driver_name} | "
+                f"user={self.request.user.username}"
+            )
+        except Exception:
+            pass
+
+        instance.delete()
+
     @extend_schema(
         description="Export drivers as CSV."
     )
     @action(detail=False, methods=["get"], url_path="export")
     def export_drivers(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            driver_count = queryset.count()
 
-        # Prepare CSV data
-        buffer = StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow([
-            "ID", "First Name", "Last Name", "Phone", "NID", "Company",
-            "License Expiry", "Vehicle License Expiry", "National ID Expiry",
-            "Contracts Count"
-        ])
+            # Safe logging
+            try:
+                logger.info(
+                    f"Driver export started | user={request.user.username} | count={driver_count}"
+                )
+            except Exception:
+                pass
 
-        for driver in queryset:
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
             writer.writerow([
-                driver.id,
-                driver.first_name,
-                driver.last_name,
-                driver.phone_number,
-                driver.nid or "",
-                driver.company.name if driver.company else "",
-                driver.license.expiry_date if getattr(driver, "license", None) else "",
-                driver.vehicle_license.expiry_date if getattr(driver, "vehicle_license", None) else "",
-                driver.national_id_doc.expiry_date if getattr(driver, "national_id_doc", None) else "",
-                driver.contracts.count(),
+                "ID", "First Name", "Last Name", "Phone", "NID", "Company",
+                "License Expiry", "Vehicle License Expiry", "National ID Expiry",
+                "Contracts Count"
             ])
 
-        # Create HTTP response
-        response = HttpResponse(buffer.getvalue(), content_type="text/csv")
-        response["Content-Disposition"] = f'attachment; filename="drivers_export_{timezone.now().date()}.csv"'
-        return response
+            for driver in queryset:
+                writer.writerow([
+                    driver.id,
+                    driver.first_name,
+                    driver.last_name,
+                    driver.phone_number,
+                    driver.nid or "",
+                    driver.company.name if driver.company else "",
+                    driver.license.expiry_date if getattr(driver, "license", None) else "",
+                    driver.vehicle_license.expiry_date if getattr(driver, "vehicle_license", None) else "",
+                    driver.national_id_doc.expiry_date if getattr(driver, "national_id_doc", None) else "",
+                    driver.contracts.count(),
+                ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Driver export completed | user={request.user.username} | count={driver_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="drivers_export_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            # Utility function is already safe via @_safe_log decorator
+            log_error(e, context="Driver export failed", user=request.user.username)
+            raise
 
 class BaseDocumentViewSet(viewsets.ModelViewSet):
     """

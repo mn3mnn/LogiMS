@@ -1,3 +1,4 @@
+import logging
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -18,6 +19,9 @@ from .serializers import (
 )
 from ..tasks import process_excel_file
 from .filters import FileUploadFilterSet, PaymentRecordFilterSet
+from logims.contrib.logging_utils import log_api_call, log_model_change, log_error
+
+logger = logging.getLogger(__name__)
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -69,39 +73,114 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Create file upload and automatically start processing"""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
 
-        # Create the file upload
-        file_upload = serializer.save(created_by=request.user)
+            # Create the file upload
+            file_upload = serializer.save(created_by=request.user)
 
-        # Check if processor is available for this company
-        if ProcessorFactory.is_processor_available(file_upload.company.code):
-            # Start processing asynchronously
-            process_excel_file.delay(file_upload.id)
-            processing_status = "Processing started automatically"
-        else:
-            # Mark as failed if no processor is available
-            file_upload.mark_processing_failed(
-                f"No processor available for company '{file_upload.company.name}'"
+            # Safe logging
+            try:
+                logger.info(
+                    f"File upload created | id={file_upload.id} | "
+                    f"company={file_upload.company.name} | "
+                    f"file_type={file_upload.file_type} | "
+                    f"user={request.user.username}"
+                )
+            except Exception:
+                pass
+
+            # Check if processor is available for this company
+            if ProcessorFactory.is_processor_available(file_upload.company.code):
+                # Start processing asynchronously
+                process_excel_file.delay(file_upload.id)
+                processing_status = "Processing started automatically"
+
+                # Safe logging
+                try:
+                    logger.info(
+                        f"File processing queued | file_upload_id={file_upload.id} | "
+                        f"company={file_upload.company.name}"
+                    )
+                except Exception:
+                    pass
+            else:
+                # Mark as failed if no processor is available
+                file_upload.mark_processing_failed(
+                    f"No processor available for company '{file_upload.company.name}'"
+                )
+                processing_status = "Processing failed - no processor available"
+
+                # Safe logging
+                try:
+                    logger.warning(
+                        f"No processor available | file_upload_id={file_upload.id} | "
+                        f"company={file_upload.company.name} | company_code={file_upload.company.code}"
+                    )
+                except Exception:
+                    pass
+
+            # Utility function is already safe via @_safe_log decorator
+            log_model_change(
+                action="create",
+                model_name="FileUpload",
+                instance_id=file_upload.id,
+                user=request.user,
+                company=file_upload.company.name,
+                file_type=file_upload.file_type
             )
-            processing_status = "Processing failed - no processor available"
 
-        # Return detailed response
-        response_serializer = FileUploadDetailSerializer(file_upload)
-        return Response({
-            'file_upload': response_serializer.data,
-            'message': f'File uploaded successfully. {processing_status}.',
-            'processing_status': processing_status
-        }, status=status.HTTP_201_CREATED)
+            # Return detailed response
+            response_serializer = FileUploadDetailSerializer(file_upload)
+            return Response({
+                'file_upload': response_serializer.data,
+                'message': f'File uploaded successfully. {processing_status}.',
+                'processing_status': processing_status
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            # Utility function is already safe via @_safe_log decorator
+            log_error(e, context="File upload creation failed", user=request.user.username)
+            raise
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete file upload with logging."""
+        instance = self.get_object()
+        file_id = instance.id
+        company_name = instance.company.name
+
+        # Direct logger call needs protection
+        try:
+            logger.info(
+                f"File upload deletion | id={file_id} | company={company_name} | "
+                f"user={request.user.username}"
+            )
+        except Exception:
+            pass
+
+        # Utility function is already safe via @_safe_log decorator
+        log_model_change(
+            action="delete",
+            model_name="FileUpload",
+            instance_id=file_id,
+            user=request.user,
+            company=company_name
+        )
+
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Basic stats: counts by status and file_type"""
         from django.db.models import Count
+
+        logger.debug(f"File upload stats requested | user={request.user.username}")
+
         qs = self.filter_queryset(self.get_queryset())
         by_status = qs.values('status').annotate(count=Count('id')).order_by()
         by_type = qs.values('file_type').annotate(count=Count('id')).order_by()
+
         return Response({
             'by_status': list(by_status),
             'by_type': list(by_type),
