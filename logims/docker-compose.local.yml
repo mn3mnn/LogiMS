@@ -50,6 +50,8 @@ services:
       - postgres
     ports: []
     command: /start-celeryworker
+    mem_limit: 1g
+    mem_reservation: 512m
 
   celerybeat:
     <<: *django

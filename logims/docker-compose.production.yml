@@ -58,6 +58,12 @@ services:
     <<: *django
     image: logims_production_celeryworker
     command: /start-celeryworker
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   celerybeat:
     <<: *django
