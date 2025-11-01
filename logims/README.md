@@ -9,6 +9,11 @@ Logistics Management System
 
 Moved to [settings](https://cookiecutter-django.readthedocs.io/en/latest/1-getting-started/settings.html).
 
+## .env
+env files should be in logims/.envs/.local OR logims/.envs/.production: 
+  - /.django
+  - /.postgres
+
 ## Basic Commands
 
 ### Running Locally with Docker
