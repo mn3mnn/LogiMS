@@ -213,76 +213,76 @@ def send_processing_notification(file_upload_id, status, error_message=None):
             notification_status=status
         )
 
-
-@shared_task
-def cleanup_old_files(days_old=30):
-    """
-    Clean up old processed files to save storage space
-
-    Args:
-        days_old: Number of days after which to delete files
-    """
-    from datetime import timedelta
-    from django.utils import timezone
-    import os
-
-    logger.info(f"Starting file cleanup task | days_old={days_old}")
-
-    cutoff_date = timezone.now() - timedelta(days=days_old)
-    old_files = FileUpload.objects.filter(
-        status='completed',
-        processing_completed_at__lt=cutoff_date
-    )
-
-    total_files = old_files.count()
-    logger.info(f"Found {total_files} files to cleanup | cutoff_date={cutoff_date}")
-
-    deleted_count = 0
-    error_count = 0
-
-    for file_upload in old_files:
-        try:
-            file_id = file_upload.id
-            company = file_upload.company.name
-
-            # Delete the file via the configured storage backend
-            if file_upload.file:
-                storage_name = file_upload.file.name
-                file_upload.file.delete(save=False)
-                logger.debug(f"Stored file deleted | name={storage_name}")
-
-            # Delete related records
-            payment_count = file_upload.payment_records.count()
-            trip_count = file_upload.trip_records.count()
-
-            file_upload.payment_records.all().delete()
-            file_upload.trip_records.all().delete()
-
-            # Delete the file upload record
-            file_upload.delete()
-            deleted_count += 1
-
-            logger.info(
-                f"File cleaned up | file_id={file_id} | company={company} | "
-                f"payment_records={payment_count} | trip_records={trip_count}"
-            )
-
-        except Exception as e:
-            error_count += 1
-            log_error(
-                e,
-                context="File cleanup failed",
-                file_upload_id=file_upload.id,
-                company=file_upload.company.name
-            )
-
-    logger.info(
-        f"File cleanup completed | total={total_files} | deleted={deleted_count} | "
-        f"errors={error_count} | days_old={days_old}"
-    )
-
-    return {
-        'total_files': total_files,
-        'deleted_count': deleted_count,
-        'error_count': error_count
-    }
+#
+# @shared_task
+# def cleanup_old_files(days_old=30):
+#     """
+#     Clean up old processed files to save storage space
+#
+#     Args:
+#         days_old: Number of days after which to delete files
+#     """
+#     from datetime import timedelta
+#     from django.utils import timezone
+#     import os
+#
+#     logger.info(f"Starting file cleanup task | days_old={days_old}")
+#
+#     cutoff_date = timezone.now() - timedelta(days=days_old)
+#     old_files = FileUpload.objects.filter(
+#         status='completed',
+#         processing_completed_at__lt=cutoff_date
+#     )
+#
+#     total_files = old_files.count()
+#     logger.info(f"Found {total_files} files to cleanup | cutoff_date={cutoff_date}")
+#
+#     deleted_count = 0
+#     error_count = 0
+#
+#     for file_upload in old_files:
+#         try:
+#             file_id = file_upload.id
+#             company = file_upload.company.name
+#
+#             # Delete the file via the configured storage backend
+#             if file_upload.file:
+#                 storage_name = file_upload.file.name
+#                 file_upload.file.delete(save=False)
+#                 logger.debug(f"Stored file deleted | name={storage_name}")
+#
+#             # Delete related records
+#             payment_count = file_upload.payment_records.count()
+#             trip_count = file_upload.trip_records.count()
+#
+#             file_upload.payment_records.all().delete()
+#             file_upload.trip_records.all().delete()
+#
+#             # Delete the file upload record
+#             file_upload.delete()
+#             deleted_count += 1
+#
+#             logger.info(
+#                 f"File cleaned up | file_id={file_id} | company={company} | "
+#                 f"payment_records={payment_count} | trip_records={trip_count}"
+#             )
+#
+#         except Exception as e:
+#             error_count += 1
+#             log_error(
+#                 e,
+#                 context="File cleanup failed",
+#                 file_upload_id=file_upload.id,
+#                 company=file_upload.company.name
+#             )
+#
+#     logger.info(
+#         f"File cleanup completed | total={total_files} | deleted={deleted_count} | "
+#         f"errors={error_count} | days_old={days_old}"
+#     )
+#
+#     return {
+#         'total_files': total_files,
+#         'deleted_count': deleted_count,
+#         'error_count': error_count
+#     }
