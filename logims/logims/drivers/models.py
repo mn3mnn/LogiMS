@@ -44,6 +44,15 @@ class Document(models.Model):
     class Meta:
         abstract = True
 
+    def delete(self, using=None, keep_parents=False):
+        """
+        Ensure the underlying file is deleted from storage when the document
+        is deleted via the admin or API.
+        """
+        if self.file:
+            self.file.delete(save=False)
+        return super().delete(using=using, keep_parents=keep_parents)
+
     @property
     def is_expired(self):
         return self.expiry_date and self.expiry_date < timezone.now().date()

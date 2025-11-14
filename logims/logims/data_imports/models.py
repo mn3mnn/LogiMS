@@ -95,6 +95,15 @@ class FileUpload(models.Model):
     def __str__(self):
         return f"{self.company.name} - {self.get_file_type_display()} ({self.from_date} to {self.to_date})"
 
+    def delete(self, using=None, keep_parents=False):
+        """
+        Ensure the underlying uploaded file is deleted from storage when the
+        FileUpload record is deleted via the admin or API.
+        """
+        if self.file:
+            self.file.delete(save=False)
+        return super().delete(using=using, keep_parents=keep_parents)
+
     def mark_processing_started(self):
         """Mark file as processing started"""
         self.status = ProcessingStatus.PROCESSING
