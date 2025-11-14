@@ -217,8 +217,20 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
-        """Get summary statistics for payment records"""
-        from django.db.models import Sum, Count, Avg
+        """Get summary statistics for payment records.
+
+        This endpoint powers the admin dashboard Payment Summary section.
+        Returned fields:
+          - total_records: number of payment records
+          - total_revenue: gross revenue received from Uber Eats
+          - total_payouts: total payouts reported in the file
+          - total_net_earnings: net amount paid to drivers (after all deductions)
+          - agency_profit: total agency share deducted from drivers
+          - total_tax_deduction: total tax deducted from drivers
+          - total_insurance_deduction: total insurance deducted from drivers
+          - total_tax_and_insurance: tax + insurance deductions combined
+        """
+        from django.db.models import Sum, Count
 
         queryset = self.filter_queryset(self.get_queryset())
 
@@ -226,8 +238,16 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
             total_records=Count('id'),
             total_revenue=Sum('total_revenue'),
             total_payouts=Sum('payouts'),
-            total_net_earnings=Sum('final_net_earnings')
+            total_net_earnings=Sum('final_net_earnings'),
+            agency_profit=Sum('agency_share_deduction'),
+            total_tax_deduction=Sum('tax_deduction'),
+            total_insurance_deduction=Sum('insurance_deduction'),
         )
+
+        # Convenience field: combined tax + insurance
+        tax = summary.get('total_tax_deduction') or 0
+        insurance = summary.get('total_insurance_deduction') or 0
+        summary['total_tax_and_insurance'] = tax + insurance
 
         return Response(summary)
 
@@ -364,6 +384,29 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['created_at', 'order_time', 'fare_amount', 'trip_distance', 'trip_duration_minutes']
     ordering = ['-created_at']
     pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        """
+        Optionally filter trips by company code and file upload date range.
+
+        Supported query params (to align with payment-records filters):
+          - company_code: maps to file_upload__company__code
+          - from_date:    file_upload__from_date >= value (YYYY-MM-DD)
+          - to_date:      file_upload__to_date <= value (YYYY-MM-DD)
+        """
+        qs = super().get_queryset().select_related('file_upload__company')
+        company_code = self.request.query_params.get('company_code')
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+
+        if company_code:
+            qs = qs.filter(file_upload__company__code=company_code)
+        if from_date:
+            qs = qs.filter(file_upload__from_date__gte=from_date)
+        if to_date:
+            qs = qs.filter(file_upload__to_date__lte=to_date)
+
+        return qs
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
