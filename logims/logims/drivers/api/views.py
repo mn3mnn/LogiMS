@@ -56,7 +56,7 @@ class DriverViewSet(viewsets.ModelViewSet):
         "nid",
         "uuid",
     ]
-    ordering_fields = ["first_name", "last_name", "created_at", "updated_at", ]
+    ordering_fields = ["first_name", "last_name", "created_at", "updated_at", "agency_share", "insurance"]
     ordering = ["updated_at"]  # default ordering
 
     def get_queryset(self):

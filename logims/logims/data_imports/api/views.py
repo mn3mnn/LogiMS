@@ -204,7 +204,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PaymentRecordFilterSet
     search_fields = ['driver_first_name', 'driver_last_name', 'driver_uuid']
-    ordering_fields = ['created_at', 'total_revenue', 'payouts', 'final_net_earnings', 'applied_tax_rate', 'applied_agency_share_rate']
+    ordering_fields = ['created_at', 'total_revenue', 'payouts', 'final_net_earnings', 'applied_tax_rate', 'applied_agency_share_rate', 'tax_deduction', 'agency_share_deduction', 'insurance_deduction', 'total_deductions']
     ordering = ['-created_at']
     pagination_class = StandardResultsSetPagination
 
