@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .utils import driver_document_path
 from .enums import DriverDocumentsStatus
+from logims.storage_backends import R2MediaStorage
 
 
 class Driver(models.Model):
@@ -32,7 +33,8 @@ class Driver(models.Model):
 
 
 class Document(models.Model):
-    file = models.FileField(upload_to=driver_document_path)
+    # Store driver documents in R2
+    file = models.FileField(upload_to=driver_document_path, storage=R2MediaStorage())
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)

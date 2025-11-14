@@ -75,3 +75,20 @@ INSTALLED_APPS += ["django_extensions"]
 CELERY_TASK_EAGER_PROPAGATES = True
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+# Optional: Configure Cloudflare R2 credentials for local when USE_R2_STORAGE=yes.
+# Only specific FileFields use R2 storage; default MEDIA/STATIC remain local.
+if env("USE_R2_STORAGE", default="no").lower() == "yes":
+    # Map R2 env vars to django-storages AWS_* settings
+    AWS_ACCESS_KEY_ID = env("R2_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = env("R2_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = env("R2_BUCKET_NAME")
+
+    AWS_S3_ENDPOINT_URL = env("R2_ENDPOINT_URL")
+    AWS_S3_REGION_NAME = None
+    AWS_S3_ADDRESSING_STYLE = "path"
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)  # Private bucket with signed URLs
+    AWS_DEFAULT_ACL = None
+
+    AWS_S3_CUSTOM_DOMAIN = env("R2_PUBLIC_DOMAIN", default=None)

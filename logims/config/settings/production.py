@@ -72,51 +72,41 @@ SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
 )
 
 
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
-AWS_ACCESS_KEY_ID = env("DJANGO_AWS_ACCESS_KEY_ID")
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
-AWS_SECRET_ACCESS_KEY = env("DJANGO_AWS_SECRET_ACCESS_KEY")
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
-AWS_STORAGE_BUCKET_NAME = env("DJANGO_AWS_STORAGE_BUCKET_NAME")
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
-AWS_QUERYSTRING_AUTH = False
-# DO NOT change these unless you know what you're doing.
+# Cloudflare R2 via S3-compatible django-storages
+# ------------------------------------------------------------------------------
+# Map R2 env vars to django-storages AWS_* settings
+AWS_ACCESS_KEY_ID = env("R2_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = env("R2_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = env("R2_BUCKET_NAME")
+
+# S3-compatible options for R2
+AWS_S3_ENDPOINT_URL = env("R2_ENDPOINT_URL")  # e.g. https://<account_id>.r2.cloudflarestorage.com
+AWS_S3_REGION_NAME = None  # R2 does not use regions
+AWS_S3_ADDRESSING_STYLE = "path"  # R2 S3 API uses path-style by default
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)  # Private bucket with signed URLs
+AWS_DEFAULT_ACL = None  # R2 does not support ACLs; use bucket-level public access
+
+# Caching/transfer tuning
 _AWS_EXPIRY = 60 * 60 * 24 * 7
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": f"max-age={_AWS_EXPIRY}, s-maxage={_AWS_EXPIRY}, must-revalidate",
 }
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
-AWS_S3_MAX_MEMORY_SIZE = env.int(
-    "DJANGO_AWS_S3_MAX_MEMORY_SIZE",
-    default=100_000_000,  # 100MB
-)
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
-AWS_S3_REGION_NAME = env("DJANGO_AWS_S3_REGION_NAME", default=None)
-# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#cloudfront
-AWS_S3_CUSTOM_DOMAIN = env("DJANGO_AWS_S3_CUSTOM_DOMAIN", default=None)
-aws_s3_domain = AWS_S3_CUSTOM_DOMAIN or f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+AWS_S3_MAX_MEMORY_SIZE = env.int("R2_MAX_MEMORY_SIZE", default=100_000_000)  # 100MB
+
+# Public domain used in file URLs (R2.dev or custom domain)
+AWS_S3_CUSTOM_DOMAIN = env("R2_PUBLIC_DOMAIN", default=None)
+_public_domain = AWS_S3_CUSTOM_DOMAIN
+
 # STATIC & MEDIA
 # ------------------------
+# Use Django's default filesystem storage for MEDIA/STATIC (as in base settings)
+# and rely on per-field R2 storage for specific models (driver docs, file uploads).
 STORAGES = {
-    "default": {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "location": "media",
-            "file_overwrite": False,
-        },
-    },
     "staticfiles": {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "location": "static",
-            "default_acl": "public-read",
-        },
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
-MEDIA_URL = f"https://{aws_s3_domain}/media/"
-COLLECTFASTA_STRATEGY = "collectfasta.strategies.boto3.Boto3Strategy"
-STATIC_URL = f"https://{aws_s3_domain}/static/"
 
 # EMAIL
 # ------------------------------------------------------------------------------

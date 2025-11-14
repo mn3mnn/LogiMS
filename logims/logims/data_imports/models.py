@@ -3,6 +3,8 @@ from django.core.validators import FileExtensionValidator, MinValueValidator, Ma
 from django.utils import timezone
 from enum import Enum
 
+from logims.storage_backends import R2MediaStorage
+
 
 class FileType(models.TextChoices):
     PAYMENTS = "payments", "Payments/Payroll"
@@ -59,7 +61,8 @@ class FileUpload(models.Model):
     )
     file = models.FileField(
         upload_to="file_uploads/%Y/%m/%d/",
-        validators=[FileExtensionValidator(allowed_extensions=['xlsx', 'xls', 'csv'])]
+        validators=[FileExtensionValidator(allowed_extensions=['xlsx', 'xls', 'csv'])],
+        storage=R2MediaStorage(),  # Store uploaded Excel/CSV files in R2
     )
     from_date = models.DateField(help_text="Start date for the data period")
     to_date = models.DateField(help_text="End date for the data period")

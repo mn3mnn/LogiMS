@@ -245,11 +245,11 @@ def cleanup_old_files(days_old=30):
             file_id = file_upload.id
             company = file_upload.company.name
 
-            # Delete the physical file
-            if file_upload.file and os.path.exists(file_upload.file.path):
-                file_path = file_upload.file.path
-                os.remove(file_path)
-                logger.debug(f"Physical file deleted | path={file_path}")
+            # Delete the file via the configured storage backend
+            if file_upload.file:
+                storage_name = file_upload.file.name
+                file_upload.file.delete(save=False)
+                logger.debug(f"Stored file deleted | name={storage_name}")
 
             # Delete related records
             payment_count = file_upload.payment_records.count()
