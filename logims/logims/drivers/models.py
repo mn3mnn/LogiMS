@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .utils import driver_document_path
 from .enums import DriverDocumentsStatus
+from logims.storage_backends import R2MediaStorage
 
 
 class Driver(models.Model):
@@ -11,6 +12,8 @@ class Driver(models.Model):
     last_name = models.CharField(max_length=255)
     nid = models.CharField(max_length=100, unique=True, null=True, blank=True)
     uuid = models.CharField(max_length=100, null=True, blank=True)
+    email = models.EmailField(max_length=255, null=True, blank=True)
+    reports_to = models.CharField(max_length=255, null=True, blank=True)
     phone_number = models.CharField(max_length=20)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
@@ -30,7 +33,8 @@ class Driver(models.Model):
 
 
 class Document(models.Model):
-    file = models.FileField(upload_to=driver_document_path)
+    # Store driver documents in R2
+    file = models.FileField(upload_to=driver_document_path, storage=R2MediaStorage())
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -39,6 +43,15 @@ class Document(models.Model):
 
     class Meta:
         abstract = True
+
+    def delete(self, using=None, keep_parents=False):
+        """
+        Ensure the underlying file is deleted from storage when the document
+        is deleted via the admin or API.
+        """
+        if self.file:
+            self.file.delete(save=False)
+        return super().delete(using=using, keep_parents=keep_parents)
 
     @property
     def is_expired(self):

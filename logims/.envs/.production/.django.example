@@ -20,11 +20,18 @@ SENDGRID_GENERATE_MESSAGE_ID=True
 SENDGRID_MERGE_FIELD_FORMAT=None
 
 
-# AWS
+# Cloudflare R2
 # ------------------------------------------------------------------------------
-DJANGO_AWS_ACCESS_KEY_ID=
-DJANGO_AWS_SECRET_ACCESS_KEY=
-DJANGO_AWS_STORAGE_BUCKET_NAME=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_ENDPOINT_URL=R2_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
+AWS_QUERYSTRING_AUTH=True
+
+# Public domain for serving files (e.g. <bucket>.r2.dev or files.logims.com)
+R2_PUBLIC_DOMAIN=
+## Optional: override default in-memory upload limit (bytes). Default: 100_000_000
+# R2_MAX_MEMORY_SIZE=100000000
 
 # django-allauth
 # ------------------------------------------------------------------------------

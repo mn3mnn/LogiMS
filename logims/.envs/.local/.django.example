@@ -1,0 +1,42 @@
+# General
+# ------------------------------------------------------------------------------
+USE_DOCKER=yes
+IPYTHONDIR=/app/.ipython
+FRONTEND_URL="http://localhost:5173"
+# Redis
+# ------------------------------------------------------------------------------
+REDIS_URL=redis://redis:6379/0
+
+# Celery
+# ------------------------------------------------------------------------------
+
+# Flower
+CELERY_FLOWER_USER=debug
+CELERY_FLOWER_PASSWORD=debug
+
+# Email Configuration - Hostinger
+# ------------------------------------------------------------------------------
+DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.hostinger.com
+EMAIL_PORT=465
+EMAIL_USE_SSL=True
+EMAIL_HOST_USER=admin@kresh-gmbh.de
+EMAIL_HOST_PASSWORD=
+DEFAULT_FROM_EMAIL=admin@kresh-gmbh.de
+
+
+
+# Cloudflare R2
+# ------------------------------------------------------------------------------
+USE_R2_STORAGE=YES
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
+AWS_QUERYSTRING_AUTH=True
+
+# Public domain for serving files (e.g. <bucket>.r2.dev or files.logims.com)
+#R2_PUBLIC_DOMAIN=
+## Optional: override default in-memory upload limit (bytes). Default: 100_000_000
+# R2_MAX_MEMORY_SIZE=100000000
+

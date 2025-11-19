@@ -34,13 +34,14 @@ class DriverAdmin(admin.ModelAdmin):
         "id",
         "first_name",
         "last_name",
+        "email",
         "phone_number",
         "company",
         "is_active",
         "created_at",
     )
     list_filter = ("is_active", "company")
-    search_fields = ("first_name", "last_name", "phone_number", "uuid")
+    search_fields = ("first_name", "last_name", "email", "phone_number", "uuid")
     readonly_fields = ("created_at", "updated_at")
     inlines = [
         DriverNationalIDInline,

@@ -45,12 +45,13 @@ class BaseExcelProcessor(ABC):
     def _read_excel_file(self) -> pd.DataFrame:
         """Read Excel or CSV file and return DataFrame"""
         try:
-            file_path = self.file_upload.file.path
-            if file_path.lower().endswith('.csv'):
-                df = pd.read_csv(file_path)
-            else:
-                df = pd.read_excel(file_path)
-            return df
+            file_field = self.file_upload.file
+            file_name = (file_field.name or "").lower()
+            with file_field.open("rb") as f:
+                if file_name.endswith(".csv"):
+                    return pd.read_csv(f)
+                else:
+                    return pd.read_excel(f)
         except Exception as e:
             raise ValueError(f"Failed to read file: {str(e)}")
 

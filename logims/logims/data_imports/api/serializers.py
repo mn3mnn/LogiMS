@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.core.files.uploadedfile import UploadedFile
 from ..models import FileUpload, PaymentRecord, TripRecord
 from logims.drivers.models import Driver
+from logims.drivers.models import Driver
 from ..processors.factory import ProcessorFactory
 
 
@@ -123,11 +124,12 @@ class TripRecordSerializer(serializers.ModelSerializer):
 
     driver_name = serializers.SerializerMethodField()
     company_name = serializers.CharField(source='file_upload.company.name', read_only=True)
+    driver_id = serializers.SerializerMethodField()
 
     class Meta:
         model = TripRecord
         fields = [
-            'id', 'file_upload', 'company_name', 'trip_uuid', 'driver_uuid',
+            'id', 'file_upload', 'company_name', 'trip_uuid', 'driver_uuid', 'driver_id',
             'driver_name', 'driver_first_name', 'driver_last_name', 'vehicle_uuid',
             'license_plate', 'service_type', 'order_time', 'arrival_time',
             'pickup_address', 'destination_address', 'trip_distance', 'trip_status',
@@ -138,6 +140,12 @@ class TripRecordSerializer(serializers.ModelSerializer):
     def get_driver_name(self, obj):
         """Get full driver name"""
         return f"{obj.driver_first_name} {obj.driver_last_name}"
+
+    def get_driver_id(self, obj):
+        if not obj.driver_uuid:
+            return None
+        driver = Driver.objects.filter(uuid=obj.driver_uuid).only('id').first()
+        return driver.id if driver else None
 
 
 class FileUploadDetailSerializer(serializers.ModelSerializer):

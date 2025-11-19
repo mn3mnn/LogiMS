@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Expiration Warning Summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 30px;
+        }
+        .header {
+            background-color: #ff9800;
+            color: white;
+            padding: 20px;
+            border-radius: 5px 5px 0 0;
+            margin: -30px -30px 30px -30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .summary-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .document-item {
+            background-color: #f9f9f9;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 3px;
+        }
+        .document-item:hover {
+            background-color: #f0f0f0;
+        }
+        .document-number {
+            display: inline-block;
+            background-color: #ff9800;
+            color: white;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            border-radius: 50%;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .driver-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .detail-row {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+            display: inline-block;
+            width: 150px;
+        }
+        .expiry-badge {
+            background-color: #ff9800;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Document Expiration Warning Summary</h1>
+        </div>
+
+        <p>Dear Administrator,</p>
+
+        <p>This is a summary of all documents that will <strong>expire soon</strong>:</p>
+
+        <div class="summary-box">
+            📋 {{ documents|length }} Document{% if documents|length != 1 %}s{% endif %} Expiring Within {{ warning_days }} Days
+        </div>
+
+        {% for item in documents %}
+        <div class="document-item">
+            <div class="driver-name">
+                <span class="document-number">{{ forloop.counter }}</span>
+                {{ item.driver.first_name }} {{ item.driver.last_name }}
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">Document Type:</span>
+                {{ item.doc_type_display }}
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">Expiry Date:</span>
+                {{ item.document.expiry_date|date:"F d, Y" }}
+                <span class="expiry-badge">⏰ {{ item.days_until_expiry }} day{% if item.days_until_expiry != 1 %}s{% endif %}</span>
+            </div>
+
+            {% if item.driver.phone_number %}
+            <div class="detail-row">
+                <span class="detail-label">Phone:</span>
+                {{ item.driver.phone_number }}
+            </div>
+            {% endif %}
+
+            {% if item.driver.email %}
+            <div class="detail-row">
+                <span class="detail-label">Email:</span>
+                {{ item.driver.email }}
+            </div>
+            {% endif %}
+
+            {% if item.driver.company %}
+            <div class="detail-row">
+                <span class="detail-label">Company:</span>
+                {{ item.driver.company.name }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <p style="margin-top: 30px;"><strong>Action Required:</strong></p>
+        <p>Please ensure these documents are renewed before their expiration dates to avoid service interruptions.</p>
+        <p>You can contact the drivers directly or review the documents in the LogiMS admin panel.</p>
+
+        <div class="footer">
+            <p>This is an automated notification from LogiMS.</p>
+            <p>Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+

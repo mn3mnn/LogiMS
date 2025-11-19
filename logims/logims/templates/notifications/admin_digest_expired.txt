@@ -1,0 +1,32 @@
+URGENT: Expired Documents - Summary
+
+Dear Administrator,
+
+This is an URGENT summary of all documents that have EXPIRED:
+
+EXPIRED DOCUMENTS:
+================================================================
+{% for item in documents %}
+{{ forloop.counter }}. {{ item.driver.first_name }} {{ item.driver.last_name }}
+   Document Type: {{ item.doc_type_display }}
+   Expiry Date: {{ item.document.expiry_date|date:"F d, Y" }}
+   Days Since Expiration: {{ item.days_since_expired }} day{% if item.days_since_expired != 1 %}s{% endif %} AGO
+   {% if item.driver.phone_number %}Phone: {{ item.driver.phone_number }}{% endif %}
+   {% if item.driver.email %}Email: {{ item.driver.email }}{% endif %}
+   {% if item.driver.company %}Company: {{ item.driver.company.name }}{% endif %}
+
+{% endfor %}
+================================================================
+
+Total Expired Documents: {{ documents|length }}
+
+IMMEDIATE ACTION REQUIRED:
+
+These expired documents may affect the drivers' ability to work and could have legal implications.
+Please contact the drivers immediately and ensure they renew these documents.
+
+You can review these documents in the LogiMS admin panel and take appropriate action.
+
+Thank you,
+LogiMS Team
+

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Expiration Warning</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 30px;
+        }
+        .header {
+            background-color: #ff9800;
+            color: white;
+            padding: 20px;
+            border-radius: 5px 5px 0 0;
+            margin: -30px -30px 30px -30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .warning-icon {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .info-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .info-row {
+            margin: 10px 0;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .expiry-highlight {
+            background-color: #ff9800;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Document Expiration Warning</h1>
+        </div>
+
+        <p>Dear {% if driver.email %}{{ driver.first_name }} {{ driver.last_name }}{% else %}Administrator{% endif %},</p>
+
+        <p>This is a reminder that the following document will <strong>expire soon</strong>:</p>
+
+        <div class="info-box">
+            <div class="info-row">
+                <span class="info-label">Driver:</span>
+                {{ driver.first_name }} {{ driver.last_name }}
+            </div>
+            {% if driver.nid %}
+            <div class="info-row">
+                <span class="info-label">National ID:</span>
+                {{ driver.nid }}
+            </div>
+            {% endif %}
+            {% if driver.phone_number %}
+            <div class="info-row">
+                <span class="info-label">Phone:</span>
+                {{ driver.phone_number }}
+            </div>
+            {% endif %}
+            {% if driver.email %}
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                {{ driver.email }}
+            </div>
+            {% endif %}
+            {% if company %}
+            <div class="info-row">
+                <span class="info-label">Company:</span>
+                {{ company.name }}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="info-box" style="background-color: #ffe6e6; border-color: #ff9800;">
+            <div class="info-row">
+                <span class="info-label">Document Type:</span>
+                {{ doc_type_display }}
+            </div>
+            <div class="info-row">
+                <span class="info-label">Expiry Date:</span>
+                {{ expiry_date|date:"F d, Y" }}
+            </div>
+        </div>
+
+        <div class="expiry-highlight">
+            ⏰ {{ days_until_expiry }} day{% if days_until_expiry != 1 %}s{% endif %} until expiration
+        </div>
+
+        <p><strong>Action Required:</strong></p>
+        <p>Please ensure the document is renewed before the expiration date to avoid service interruptions.</p>
+
+        {% if driver.email %}
+        <p>If you have already renewed this document, please update it in the system.</p>
+        {% else %}
+        <p>Please contact the driver to ensure they renew this document promptly.</p>
+        {% endif %}
+
+        <div class="footer">
+            <p>This is an automated notification from LogiMS.</p>
+            <p>Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+

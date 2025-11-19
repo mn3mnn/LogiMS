@@ -1,0 +1,29 @@
+Document Expiration Warning - Summary
+
+Dear Administrator,
+
+This is a summary of all documents that will expire soon:
+
+DOCUMENTS EXPIRING WITHIN {{ warning_days }} DAYS:
+================================================================
+{% for item in documents %}
+{{ forloop.counter }}. {{ item.driver.first_name }} {{ item.driver.last_name }}
+   Document Type: {{ item.doc_type_display }}
+   Expiry Date: {{ item.document.expiry_date|date:"F d, Y" }}
+   Days Until Expiration: {{ item.days_until_expiry }} day{% if item.days_until_expiry != 1 %}s{% endif %}
+   {% if item.driver.phone_number %}Phone: {{ item.driver.phone_number }}{% endif %}
+   {% if item.driver.email %}Email: {{ item.driver.email }}{% endif %}
+   {% if item.driver.company %}Company: {{ item.driver.company.name }}{% endif %}
+
+{% endfor %}
+================================================================
+
+Total Documents Expiring: {{ documents|length }}
+
+Please ensure these documents are renewed before their expiration dates to avoid service interruptions.
+
+You can contact the drivers directly or review the documents in the LogiMS admin panel.
+
+Thank you,
+LogiMS Team
+

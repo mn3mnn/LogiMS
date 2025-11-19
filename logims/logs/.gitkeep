@@ -1,0 +1,4 @@
+# This directory stores application logs
+# Log files are automatically rotated when they reach 10MB
+# Up to 10 backup files are kept
+
