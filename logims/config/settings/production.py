@@ -10,6 +10,7 @@ from sentry_sdk.integrations.redis import RedisIntegration
 from .base import *  # noqa: F403
 from .base import DATABASES
 from .base import INSTALLED_APPS
+from .base import MIDDLEWARE
 from .base import REDIS_URL
 from .base import SPECTACULAR_SETTINGS
 from .base import env
@@ -142,10 +143,27 @@ ANYMAIL = {
     "SENDGRID_API_URL": env("SENDGRID_API_URL", default="https://api.sendgrid.com/v3/"),
 }
 
-# Collectfasta
+# WhiteNoise for static file serving in production
+# ------------------------------------------------------------------------------
+# https://whitenoise.readthedocs.io/en/latest/django.html
+INSTALLED_APPS = ["whitenoise.runserver_nostatic", *INSTALLED_APPS]
+
+# Add WhiteNoise middleware right after SecurityMiddleware
+MIDDLEWARE = [MIDDLEWARE[0], "whitenoise.middleware.WhiteNoiseMiddleware", *MIDDLEWARE[1:]]
+
+# WhiteNoise configuration
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = False  # Set to True only in development
+
+# Collectfasta (only if using S3/R2 for static files)
 # ------------------------------------------------------------------------------
 # https://github.com/jasongi/collectfasta#installation
-INSTALLED_APPS = ["collectfasta", *INSTALLED_APPS]
+# Only install collectfasta if we're using S3/R2 storage for static files
+# If using filesystem storage, Django's default collectstatic is sufficient
+USE_R2_FOR_STATIC = env.bool("USE_R2_FOR_STATIC", default=False)
+if USE_R2_FOR_STATIC:
+    INSTALLED_APPS = ["collectfasta", *INSTALLED_APPS]
 
 # LOGGING
 # ------------------------------------------------------------------------------
