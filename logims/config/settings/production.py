@@ -105,6 +105,9 @@ _public_domain = AWS_S3_CUSTOM_DOMAIN
 # Use Django's default filesystem storage for MEDIA/STATIC (as in base settings)
 # and rely on per-field R2 storage for specific models (driver docs, file uploads).
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
