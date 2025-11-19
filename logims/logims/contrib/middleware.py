@@ -243,3 +243,18 @@ class PerformanceLoggingMiddleware(MiddlewareMixin):
 
         return response
 
+
+class DisableCSRFForAPI(MiddlewareMixin):
+    """
+    Middleware to disable CSRF protection for all API endpoints.
+    
+    REST APIs use token authentication instead of CSRF tokens,
+    so CSRF protection is not needed for /api/ paths.
+    """
+    
+    def process_request(self, request):
+        """Exempt API paths from CSRF protection."""
+        if request.path.startswith('/api/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        return None
+
