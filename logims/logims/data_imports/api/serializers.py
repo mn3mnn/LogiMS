@@ -95,13 +95,15 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
     driver_name = serializers.SerializerMethodField()
     company_name = serializers.CharField(source='file_upload.company.name', read_only=True)
     driver_id = serializers.SerializerMethodField()
+    from_date = serializers.DateField(source='file_upload.from_date', read_only=True)
+    to_date = serializers.DateField(source='file_upload.to_date', read_only=True)
 
     class Meta:
         model = PaymentRecord
         fields = [
             'id', 'file_upload', 'company_name', 'driver_uuid', 'driver_id', 'driver_name',
-            'driver_first_name', 'driver_last_name', 'total_revenue', 'net_fare',
-            'promotions', 'refunds_and_fees', 'payouts', 'bank_transfer',
+            'driver_first_name', 'driver_last_name', 'from_date', 'to_date',
+            'total_revenue', 'net_fare', 'promotions', 'refunds_and_fees', 'payouts', 'bank_transfer',
             'cash_collected', 'fare_tax', 'tips', 'taxes', 'other_revenue',
             'total_deductions', 'tax_deduction', 'agency_share_deduction',
             'insurance_deduction', 'final_net_earnings', 'created_at'
