@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from logims.drivers.models import Driver
@@ -93,8 +94,10 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
             # Check if processor is available for this company
             if ProcessorFactory.is_processor_available(file_upload.company.code):
-                # Start processing asynchronously
-                process_excel_file.delay(file_upload.id)
+                # Start processing asynchronously after transaction commits
+                # This prevents race condition where task runs before DB commit
+                file_upload_id = file_upload.id
+                transaction.on_commit(lambda: process_excel_file.delay(file_upload_id))
                 processing_status = "Processing started automatically"
 
                 # Safe logging

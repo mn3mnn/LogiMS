@@ -31,56 +31,198 @@ class UberEatsProcessor(BaseExcelProcessor):
         return []
 
     def _process_payments(self, df: pd.DataFrame) -> int:
-        """Process Uber Eats payment data"""
-        records_created = 0
-        records_updated = 0
-
+        """Process Uber Eats payment data using bulk operations with chunking for better performance.
+        The entire file processing is wrapped in a single transaction for atomicity.
+        """
+        import math
+        
+        CHUNK_SIZE = 5000
+        total_records = len(df)
+        total_processed = 0
+        total_created = 0
+        total_updated = 0
+        
+        # Process in chunks to manage memory and allow progress updates
+        num_chunks = math.ceil(total_records / CHUNK_SIZE)
+        
+        # Wrap entire file processing in a single transaction
         with transaction.atomic():
-            for _, row in df.iterrows():
-                payment_data = self._map_payment_data(row)
-                payment_data = self._calculate_payment_fields(payment_data)
-
-                # Extract driver_uuid for upsert
-                driver_uuid = payment_data.pop('driver_uuid')
-
-                # Use upsert to handle duplicates
-                record, is_created = PaymentRecord.upsert_payment_record(
-                    file_upload=self.file_upload,
-                    driver_uuid=driver_uuid,
-                    payment_data=payment_data
-                )
-
-                if is_created:
-                    records_created += 1
-                else:
-                    records_updated += 1
-
-        return records_created + records_updated
+            for chunk_idx in range(num_chunks):
+                start_idx = chunk_idx * CHUNK_SIZE
+                end_idx = min(start_idx + CHUNK_SIZE, total_records)
+                chunk_df = df.iloc[start_idx:end_idx]
+                
+                # Prepare payment data for this chunk
+                payment_records = []
+                driver_uuids = []
+                
+                for _, row in chunk_df.iterrows():
+                    payment_data = self._map_payment_data(row)
+                    payment_data = self._calculate_payment_fields(payment_data)
+                    driver_uuid = payment_data.pop('driver_uuid')
+                    
+                    payment_records.append({
+                        'driver_uuid': driver_uuid,
+                        'payment_data': payment_data
+                    })
+                    driver_uuids.append(driver_uuid)
+                
+                if not payment_records:
+                    continue
+                
+                records_created = 0
+                records_updated = 0
+                
+                # Fetch existing records for this chunk matching uniqueness criteria
+                existing_records = {}
+                for record in PaymentRecord.objects.filter(
+                    file_upload__company=self.company,
+                    file_upload__from_date=self.file_upload.from_date,
+                    file_upload__to_date=self.file_upload.to_date,
+                    driver_uuid__in=driver_uuids
+                ).select_related('file_upload'):
+                    existing_records[record.driver_uuid] = record
+                
+                # Separate new and existing records
+                new_records = []
+                update_records = []
+                
+                for record_info in payment_records:
+                    driver_uuid = record_info['driver_uuid']
+                    payment_data = record_info['payment_data']
+                    
+                    if driver_uuid in existing_records:
+                        # Update existing record
+                        existing = existing_records[driver_uuid]
+                        for field, value in payment_data.items():
+                            setattr(existing, field, value)
+                        existing.file_upload = self.file_upload
+                        update_records.append(existing)
+                    else:
+                        # Create new record
+                        payment_data['file_upload'] = self.file_upload
+                        payment_data['driver_uuid'] = driver_uuid
+                        new_records.append(PaymentRecord(**payment_data))
+                
+                # Bulk create new records
+                if new_records:
+                    PaymentRecord.objects.bulk_create(new_records, ignore_conflicts=False, batch_size=500)
+                    records_created = len(new_records)
+                
+                # Bulk update existing records
+                if update_records:
+                    PaymentRecord.objects.bulk_update(
+                        update_records,
+                        fields=[f.name for f in PaymentRecord._meta.get_fields() 
+                               if not f.primary_key and f.name != 'id' and f.name != 'created_at'],
+                        batch_size=500
+                    )
+                    records_updated = len(update_records)
+                
+                total_created += records_created
+                total_updated += records_updated
+                total_processed += len(payment_records)
+                
+                # Update progress periodically (every chunk) - within the transaction
+                self.file_upload.processed_records_count = total_processed
+                self.file_upload.save(update_fields=['processed_records_count'])
+        
+        return total_created + total_updated
 
     def _process_trips(self, df: pd.DataFrame) -> int:
-        """Process Uber Eats trip data"""
-        records_created = 0
-        records_updated = 0
-
+        """Process Uber Eats trip data using bulk operations with chunking for better performance.
+        The entire file processing is wrapped in a single transaction for atomicity.
+        """
+        import math
+        
+        CHUNK_SIZE = 5000
+        total_records = len(df)
+        total_processed = 0
+        total_created = 0
+        total_updated = 0
+        
+        # Process in chunks to manage memory and allow progress updates
+        num_chunks = math.ceil(total_records / CHUNK_SIZE)
+        
+        # Wrap entire file processing in a single transaction
         with transaction.atomic():
-            for _, row in df.iterrows():
-                trip_data = self._map_trip_data(row)
-                trip_data = self._calculate_trip_fields(trip_data)
-
-                trip_uuid = trip_data.pop('trip_uuid')
-
-                rec, is_created = TripRecord.upsert_trip_record(
-                    file_upload=self.file_upload,
-                    trip_uuid=trip_uuid,
-                    trip_data=trip_data
-                )
-
-                if is_created:
-                    records_created += 1
-                else:
-                    records_updated += 1
-
-        return records_created + records_updated
+            for chunk_idx in range(num_chunks):
+                start_idx = chunk_idx * CHUNK_SIZE
+                end_idx = min(start_idx + CHUNK_SIZE, total_records)
+                chunk_df = df.iloc[start_idx:end_idx]
+                
+                # Prepare trip data for this chunk
+                trip_records = []
+                trip_uuids = []
+                
+                for _, row in chunk_df.iterrows():
+                    trip_data = self._map_trip_data(row)
+                    trip_data = self._calculate_trip_fields(trip_data)
+                    trip_uuid = trip_data.pop('trip_uuid')
+                    
+                    trip_records.append({
+                        'trip_uuid': trip_uuid,
+                        'trip_data': trip_data
+                    })
+                    trip_uuids.append(trip_uuid)
+                
+                if not trip_records:
+                    continue
+                
+                records_created = 0
+                records_updated = 0
+                
+                # Fetch existing records for this chunk
+                existing_records = {
+                    record.trip_uuid: record 
+                    for record in TripRecord.objects.filter(trip_uuid__in=trip_uuids)
+                }
+                
+                # Separate new and existing records
+                new_records = []
+                update_records = []
+                
+                for record_info in trip_records:
+                    trip_uuid = record_info['trip_uuid']
+                    trip_data = record_info['trip_data']
+                    
+                    if trip_uuid in existing_records:
+                        # Update existing record
+                        existing = existing_records[trip_uuid]
+                        for field, value in trip_data.items():
+                            setattr(existing, field, value)
+                        existing.file_upload = self.file_upload
+                        update_records.append(existing)
+                    else:
+                        # Create new record
+                        trip_data['file_upload'] = self.file_upload
+                        trip_data['trip_uuid'] = trip_uuid
+                        new_records.append(TripRecord(**trip_data))
+                
+                # Bulk create new records
+                if new_records:
+                    TripRecord.objects.bulk_create(new_records, ignore_conflicts=False, batch_size=500)
+                    records_created = len(new_records)
+                
+                # Bulk update existing records
+                if update_records:
+                    TripRecord.objects.bulk_update(
+                        update_records,
+                        fields=[f.name for f in TripRecord._meta.get_fields() 
+                               if not f.primary_key and f.name != 'id' and f.name != 'created_at'],
+                        batch_size=500
+                    )
+                    records_updated = len(update_records)
+                
+                total_created += records_created
+                total_updated += records_updated
+                total_processed += len(trip_records)
+                
+                # Update progress periodically (every chunk) - within the transaction
+                self.file_upload.processed_records_count = total_processed
+                self.file_upload.save(update_fields=['processed_records_count'])
+        
+        return total_created + total_updated
 
     def _map_payment_data(self, row: pd.Series) -> Dict[str, Any]:
         """Map Uber Eats payment Excel row to PaymentRecord fields"""

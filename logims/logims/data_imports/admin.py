@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import transaction
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -81,8 +82,10 @@ class FileUploadAdmin(admin.ModelAdmin):
             from logims.data_imports.tasks import process_excel_file
 
             if ProcessorFactory.is_processor_available(obj.company.code):
-                # Start processing asynchronously
-                process_excel_file.delay(obj.id)
+                # Start processing asynchronously after transaction commits
+                # This prevents race condition where task runs before DB commit
+                file_upload_id = obj.id
+                transaction.on_commit(lambda: process_excel_file.delay(file_upload_id))
             else:
                 # Mark as failed if no processor is available
                 obj.mark_processing_failed(
