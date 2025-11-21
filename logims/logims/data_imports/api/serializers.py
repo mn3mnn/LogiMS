@@ -127,13 +127,15 @@ class TripRecordSerializer(serializers.ModelSerializer):
     driver_name = serializers.SerializerMethodField()
     company_name = serializers.CharField(source='file_upload.company.name', read_only=True)
     driver_id = serializers.SerializerMethodField()
+    from_date = serializers.DateField(source='file_upload.from_date', read_only=True)
+    to_date = serializers.DateField(source='file_upload.to_date', read_only=True)
 
     class Meta:
         model = TripRecord
         fields = [
             'id', 'file_upload', 'company_name', 'trip_uuid', 'driver_uuid', 'driver_id',
-            'driver_name', 'driver_first_name', 'driver_last_name', 'vehicle_uuid',
-            'license_plate', 'service_type', 'order_time', 'arrival_time',
+            'driver_name', 'driver_first_name', 'driver_last_name', 'from_date', 'to_date',
+            'vehicle_uuid', 'license_plate', 'service_type', 'order_time', 'arrival_time',
             'pickup_address', 'destination_address', 'trip_distance', 'trip_status',
             'order_submitted_time', 'trip_start_time', 'vehicle_location_at_assignment',
             'fare_amount', 'trip_duration_minutes', 'created_at'
