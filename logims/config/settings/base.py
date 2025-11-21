@@ -156,12 +156,6 @@ MIDDLEWARE = [
     "logims.contrib.middleware.PerformanceLoggingMiddleware",  # Performance logging
 ]
 
-# URL Configuration
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#append-slash
-# Explicitly enable APPEND_SLASH to ensure trailing slash redirects work correctly
-APPEND_SLASH = True
-
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
