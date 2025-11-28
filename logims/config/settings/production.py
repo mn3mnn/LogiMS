@@ -8,6 +8,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from .base import *  # noqa: F403
+from .base import BASE_DIR
 from .base import DATABASES
 from .base import INSTALLED_APPS
 from .base import MIDDLEWARE
@@ -180,34 +181,95 @@ if USE_R2_FOR_STATIC:
 # https://docs.djangoproject.com/en/dev/ref/settings/#logging
 # See https://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
+# Logs to both console (terminal) and files (logs/ directory)
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": True,
     "formatters": {
         "verbose": {
-            "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
+            "format": "%(levelname)s %(asctime)s %(name)s %(module)s %(process)d %(thread)d %(message)s",
         },
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
-    },
-    "root": {"level": "INFO", "handlers": ["console"]},
-    "loggers": {
-        "django.db.backends": {
+        "file_general": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "logims.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "file_errors": {
             "level": "ERROR",
-            "handlers": ["console"],
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "errors.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "file_requests": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "requests.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "file_celery": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(BASE_DIR / "logs" / "celery.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+    },
+    "root": {"level": "INFO", "handlers": ["console", "file_general"]},
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file_general"],
+            "level": "INFO",
             "propagate": False,
         },
-        # Errors logged by the SDK itself
-        "sentry_sdk": {"level": "ERROR", "handlers": ["console"], "propagate": False},
+        "django.request": {
+            "handlers": ["console", "file_errors", "file_requests"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console", "file_requests"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "level": "ERROR",
+            "handlers": ["console", "file_errors"],
+            "propagate": False,
+        },
+        "sentry_sdk": {
+            "level": "ERROR",
+            "handlers": ["console", "file_errors"],
+            "propagate": False,
+        },
         "django.security.DisallowedHost": {
             "level": "ERROR",
-            "handlers": ["console"],
+            "handlers": ["console", "file_errors"],
+            "propagate": False,
+        },
+        "celery": {
+            "handlers": ["console", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims": {
+            "handlers": ["console", "file_general", "file_errors"],
+            "level": "INFO",
             "propagate": False,
         },
     },
