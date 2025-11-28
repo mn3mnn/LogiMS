@@ -1,6 +1,6 @@
 from django_filters import rest_framework as filters
 from django.db.models import Q
-from ..models import FileUpload, PaymentRecord
+from ..models import FileUpload, PaymentRecord, TripRecord
 
 
 class FileUploadFilterSet(filters.FilterSet):
@@ -76,4 +76,40 @@ class PaymentRecordFilterSet(filters.FilterSet):
 
         return queryset
 
+
+class TripRecordFilterSet(filters.FilterSet):
+    """Filters for TripRecord with company and file upload date range."""
+
+    # Period-overlap filters applied to related FileUpload
+    from_date = filters.DateFilter(method="filter_period_records")
+    to_date = filters.DateFilter(method="filter_period_records")
+    company = filters.NumberFilter(field_name="file_upload__company")
+    company_code = filters.CharFilter(field_name="file_upload__company__code", lookup_expr="exact")
+
+    class Meta:
+        model = TripRecord
+        fields = {
+            "driver_uuid": ["exact"],
+            "trip_status": ["exact"],
+            "service_type": ["exact"],
+            "file_upload": ["exact"],
+            # company/from_date/to_date are defined above
+        }
+
+    def filter_period_records(self, queryset, name, value):
+        start = self.data.get('from_date')
+        end = self.data.get('to_date')
+
+        if start and end:
+            return queryset.filter(
+                Q(file_upload__from_date__lte=end) & Q(file_upload__to_date__gte=start)
+            )
+
+        if start and not end:
+            return queryset.filter(file_upload__to_date__gte=start)
+
+        if end and not start:
+            return queryset.filter(file_upload__from_date__lte=end)
+
+        return queryset
 
