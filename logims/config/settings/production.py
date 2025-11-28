@@ -115,10 +115,29 @@ STORAGES = {
 
 # EMAIL
 # ------------------------------------------------------------------------------
+# Email backend selection priority:
+# 1. SendGrid (if SENDGRID_API_KEY is provided)
+# 2. SMTP (from DJANGO_EMAIL_BACKEND env var, defaults to SMTP in base.py)
+# https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
+
+SENDGRID_API_KEY = env("SENDGRID_API_KEY", default="")
+if SENDGRID_API_KEY:
+    # Use SendGrid via Anymail
+    # https://anymail.readthedocs.io/en/stable/installation/#installing-anymail
+    INSTALLED_APPS += ["anymail"]
+    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+    ANYMAIL = {
+        "SENDGRID_API_KEY": SENDGRID_API_KEY,
+        "SENDGRID_API_URL": env("SENDGRID_API_URL", default="https://api.sendgrid.com/v3/"),
+    }
+# If SENDGRID_API_KEY is empty, SMTP backend from base.py is used
+# (configured via DJANGO_EMAIL_BACKEND env var, defaults to SMTP)
+
 # https://docs.djangoproject.com/en/dev/ref/settings/#default-from-email
+# Check both DJANGO_DEFAULT_FROM_EMAIL and DEFAULT_FROM_EMAIL for compatibility
 DEFAULT_FROM_EMAIL = env(
     "DJANGO_DEFAULT_FROM_EMAIL",
-    default="LogiMS <noreply@logims.com>",
+    default=env("DEFAULT_FROM_EMAIL", default="LogiMS <noreply@logims.com>"),
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#server-email
 SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
@@ -133,19 +152,6 @@ ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
 # ------------------------------------------------------------------------------
 # Django Admin URL regex.
 ADMIN_URL = env("DJANGO_ADMIN_URL")
-
-# Anymail
-# ------------------------------------------------------------------------------
-# https://anymail.readthedocs.io/en/stable/installation/#installing-anymail
-INSTALLED_APPS += ["anymail"]
-# https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
-# https://anymail.readthedocs.io/en/stable/installation/#anymail-settings-reference
-# https://anymail.readthedocs.io/en/stable/esps/sendgrid/
-EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
-ANYMAIL = {
-    "SENDGRID_API_KEY": env("SENDGRID_API_KEY"),
-    "SENDGRID_API_URL": env("SENDGRID_API_URL", default="https://api.sendgrid.com/v3/"),
-}
 
 # WhiteNoise for static file serving in production
 # ------------------------------------------------------------------------------
