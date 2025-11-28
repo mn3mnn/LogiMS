@@ -16,10 +16,10 @@ from ..models import FileUpload, PaymentRecord, TripRecord
 from ..processors.factory import ProcessorFactory
 from .serializers import (
     FileUploadSerializer, FileUploadListSerializer, FileUploadDetailSerializer,
-    PaymentRecordSerializer, TripRecordSerializer
+    PaymentRecordSerializer, TripRecordSerializer, TripRecordAggregatedSerializer
 )
 from ..tasks import process_excel_file
-from .filters import FileUploadFilterSet, PaymentRecordFilterSet
+from .filters import FileUploadFilterSet, PaymentRecordFilterSet, TripRecordFilterSet
 from logims.contrib.logging_utils import log_api_call, log_model_change, log_error
 
 logger = logging.getLogger(__name__)
@@ -375,41 +375,30 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
             out.append(current)
         return Response(out)
 
-
+@extend_schema(
+    parameters=[
+        OpenApiParameter(name="company", description="Filter by company ID (maps to file_upload__company)", required=False, type=int, location=OpenApiParameter.QUERY),
+        OpenApiParameter(name="company_code", description="Filter by company code (maps to file_upload__company__code)", required=False, type=str, location=OpenApiParameter.QUERY),
+        OpenApiParameter(name="from_date", description="Filter by file upload period overlap (YYYY-MM-DD)", required=False, type=str, location=OpenApiParameter.QUERY),
+        OpenApiParameter(name="to_date", description="Filter by file upload period overlap (YYYY-MM-DD)", required=False, type=str, location=OpenApiParameter.QUERY),
+        OpenApiParameter(name="search", description="Search by driver first/last name or UUID", required=False, type=str, location=OpenApiParameter.QUERY),
+    ]
+)
 class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for viewing trip records"""
 
     queryset = TripRecord.objects.all()
     serializer_class = TripRecordSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['file_upload', 'file_upload__company', 'driver_uuid', 'trip_status', 'service_type']
+    filterset_class = TripRecordFilterSet
     search_fields = ['driver_first_name', 'driver_last_name', 'driver_uuid', 'trip_uuid']
     ordering_fields = ['created_at', 'order_time', 'fare_amount', 'trip_distance', 'trip_duration_minutes']
     ordering = ['-created_at']
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        """
-        Optionally filter trips by company code and file upload date range.
-
-        Supported query params (to align with payment-records filters):
-          - company_code: maps to file_upload__company__code
-          - from_date:    file_upload__from_date >= value (YYYY-MM-DD)
-          - to_date:      file_upload__to_date <= value (YYYY-MM-DD)
-        """
-        qs = super().get_queryset().select_related('file_upload__company')
-        company_code = self.request.query_params.get('company_code')
-        from_date = self.request.query_params.get('from_date')
-        to_date = self.request.query_params.get('to_date')
-
-        if company_code:
-            qs = qs.filter(file_upload__company__code=company_code)
-        if from_date:
-            qs = qs.filter(file_upload__from_date__gte=from_date)
-        if to_date:
-            qs = qs.filter(file_upload__to_date__lte=to_date)
-
-        return qs
+        """Get queryset with select_related for performance."""
+        return super().get_queryset().select_related('file_upload__company')
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -456,6 +445,75 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
             'top_drivers': top_drivers,
             'total': qs.count(),
         })
+
+    @action(detail=False, methods=['get'])
+    def aggregated(self, request):
+        """
+        Get aggregated trip records grouped by driver, period (from_date, to_date), and trip status.
+        Returns total fare and total distance for each driver for each period and status.
+        """
+        from django.db.models import Sum, Count
+        
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Aggregate by driver_uuid, period (from_date, to_date), company, trip_status, and file_upload
+        aggregated = (
+            queryset.values(
+                'driver_uuid',
+                'driver_first_name',
+                'driver_last_name',
+                'file_upload',
+                'file_upload__from_date',
+                'file_upload__to_date',
+                'file_upload__company__name',
+                'file_upload__company__id',
+                'trip_status'
+            )
+            .annotate(
+                total_fare=Sum('fare_amount'),
+                total_distance=Sum('trip_distance'),
+                trip_count=Count('id')
+            )
+            .order_by('file_upload__from_date', 'file_upload__to_date', 'driver_first_name', 'driver_last_name', 'trip_status')
+        )
+        
+        # Get all unique driver UUIDs to batch fetch driver IDs
+        driver_uuids = list(set(row['driver_uuid'] for row in aggregated if row['driver_uuid']))
+        uuid_to_id = {
+            row['uuid']: row['id']
+            for row in Driver.objects.filter(uuid__in=driver_uuids).values('uuid', 'id')
+        }
+        
+        # Convert to list and format for serializer
+        results = []
+        for row in aggregated:
+            driver_uuid = row['driver_uuid']
+            results.append({
+                'driver_uuid': driver_uuid,
+                'driver_first_name': row['driver_first_name'],
+                'driver_last_name': row['driver_last_name'],
+                'driver_name': f"{row['driver_first_name']} {row['driver_last_name']}".strip(),
+                'driver_id': uuid_to_id.get(driver_uuid),
+                'company_name': row['file_upload__company__name'],
+                'company_id': row['file_upload__company__id'],
+                'file_upload': row['file_upload'],
+                'from_date': row['file_upload__from_date'],
+                'to_date': row['file_upload__to_date'],
+                'trip_status': row['trip_status'],
+                'total_fare': row['total_fare'] or 0,
+                'total_distance': row['total_distance'] or 0,
+                'trip_count': row['trip_count']
+            })
+        
+        # Apply pagination
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(results, request)
+        if page is not None:
+            serializer = TripRecordAggregatedSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        
+        serializer = TripRecordAggregatedSerializer(results, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def timeseries(self, request):

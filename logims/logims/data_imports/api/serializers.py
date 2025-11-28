@@ -152,6 +152,25 @@ class TripRecordSerializer(serializers.ModelSerializer):
         return driver.id if driver else None
 
 
+class TripRecordAggregatedSerializer(serializers.Serializer):
+    """Serializer for aggregated trip records by driver, period, and status"""
+    
+    driver_uuid = serializers.CharField()
+    driver_first_name = serializers.CharField()
+    driver_last_name = serializers.CharField()
+    driver_name = serializers.CharField()
+    driver_id = serializers.IntegerField(allow_null=True)
+    company_name = serializers.CharField()
+    company_id = serializers.IntegerField()
+    file_upload = serializers.IntegerField()
+    from_date = serializers.DateField()
+    to_date = serializers.DateField()
+    trip_status = serializers.CharField(allow_null=True)
+    total_fare = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_distance = serializers.DecimalField(max_digits=10, decimal_places=2)
+    trip_count = serializers.IntegerField()
+
+
 class FileUploadDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer for file upload with related records"""
 
