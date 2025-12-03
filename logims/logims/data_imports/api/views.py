@@ -1,4 +1,8 @@
+import csv
 import logging
+from io import StringIO
+from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -375,6 +379,80 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
             out.append(current)
         return Response(out)
 
+    @extend_schema(
+        description="Export payment records as CSV."
+    )
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        """Export payment records as CSV with all current filters applied."""
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            record_count = queryset.count()
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Payment records export started | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow([
+                "ID", "Upload ID", "Period From", "Period To", "Company", "Driver UUID",
+                "Driver Name", "Total Revenue", "Net Fare", "Promotions", "Refunds and Fees",
+                "Payouts", "Bank Transfer", "Cash Collected", "Fare Tax", "Tips", "Taxes",
+                "Other Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                "Insurance Deduction", "Final Net Earnings", "Created At"
+            ])
+
+            for record in queryset.select_related('file_upload__company'):
+                writer.writerow([
+                    record.id,
+                    record.file_upload.id if record.file_upload else "",
+                    record.file_upload.from_date if record.file_upload else "",
+                    record.file_upload.to_date if record.file_upload else "",
+                    record.file_upload.company.name if record.file_upload and record.file_upload.company else "",
+                    record.driver_uuid or "",
+                    f"{record.driver_first_name} {record.driver_last_name}".strip(),
+                    record.total_revenue or "",
+                    record.net_fare or "",
+                    record.promotions or "",
+                    record.refunds_and_fees or "",
+                    record.payouts or "",
+                    record.bank_transfer or "",
+                    record.cash_collected or "",
+                    record.fare_tax or "",
+                    record.tips or "",
+                    record.taxes or "",
+                    record.other_revenue or "",
+                    record.total_deductions or "",
+                    record.tax_deduction or "",
+                    record.agency_share_deduction or "",
+                    record.insurance_deduction or "",
+                    record.final_net_earnings or "",
+                    record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else "",
+                ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Payment records export completed | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="payment_records_export_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            log_error(e, context="Payment records export failed", user=request.user.username)
+            raise
+
 @extend_schema(
     parameters=[
         OpenApiParameter(name="company", description="Filter by company ID (maps to file_upload__company)", required=False, type=int, location=OpenApiParameter.QUERY),
@@ -514,6 +592,87 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = TripRecordAggregatedSerializer(results, many=True)
         return Response(serializer.data)
+
+    @extend_schema(
+        description="Export aggregated trip records as CSV."
+    )
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        """Export aggregated trip records as CSV with all current filters applied."""
+        try:
+            from django.db.models import Sum, Count
+            
+            queryset = self.filter_queryset(self.get_queryset())
+            
+            # Aggregate by driver_uuid, period (from_date, to_date), company, trip_status, and file_upload
+            aggregated = (
+                queryset.values(
+                    'driver_uuid',
+                    'driver_first_name',
+                    'driver_last_name',
+                    'file_upload',
+                    'file_upload__from_date',
+                    'file_upload__to_date',
+                    'file_upload__company__name',
+                    'file_upload__company__id',
+                    'trip_status'
+                )
+                .annotate(
+                    total_fare=Sum('fare_amount'),
+                    total_distance=Sum('trip_distance'),
+                    trip_count=Count('id')
+                )
+                .order_by('file_upload__from_date', 'file_upload__to_date', 'driver_first_name', 'driver_last_name', 'trip_status')
+            )
+            
+            record_count = aggregated.count()
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Trip records export started | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow([
+                "Period From", "Period To", "Upload ID", "Company", "Driver UUID",
+                "Driver Name", "Trip Status", "Trip Count", "Total Fare", "Total Distance"
+            ])
+
+            for row in aggregated:
+                writer.writerow([
+                    row['file_upload__from_date'] or "",
+                    row['file_upload__to_date'] or "",
+                    row['file_upload'] or "",
+                    row['file_upload__company__name'] or "",
+                    row['driver_uuid'] or "",
+                    f"{row['driver_first_name']} {row['driver_last_name']}".strip(),
+                    row['trip_status'] or "",
+                    row['trip_count'] or 0,
+                    row['total_fare'] or 0,
+                    row['total_distance'] or 0,
+                ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Trip records export completed | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="trip_records_export_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            log_error(e, context="Trip records export failed", user=request.user.username)
+            raise
 
     @action(detail=False, methods=['get'])
     def timeseries(self, request):
