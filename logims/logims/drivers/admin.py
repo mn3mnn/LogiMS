@@ -5,6 +5,7 @@ from .models import (
     DriverContract,
     DriverLicense,
     DriverVehicleLicense,
+    Supervisor,
 )
 
 
@@ -85,3 +86,10 @@ class DriverVehicleLicenseAdmin(admin.ModelAdmin):
     )
     search_fields = ("driver__first_name", "driver__last_name", "license_number", "license_plate")
     list_filter = ("vehicle_type", "is_active")
+
+
+@admin.register(Supervisor)
+class SupervisorAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "phone", "percentage", "created_at", "updated_at")
+    search_fields = ("name", "phone")
+    list_filter = ("created_at",)

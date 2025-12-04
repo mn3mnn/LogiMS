@@ -7,23 +7,36 @@ from .enums import DriverDocumentsStatus
 from logims.storage_backends import R2MediaStorage
 
 
+class Supervisor(models.Model):
+    name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=20)
+    percentage = models.FloatField(
+        help_text="Percentage (e.g., 15 for 15%)",
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
+
 class Driver(models.Model):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     nid = models.CharField(max_length=100, unique=True, null=True, blank=True)
     uuid = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(max_length=255, null=True, blank=True)
-    reports_to = models.CharField(max_length=255, null=True, blank=True)
+    supervisor = models.ForeignKey(Supervisor, on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
     phone_number = models.CharField(max_length=20)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
     insurance = models.FloatField(
         null=True, blank=True, help_text="Insurance amount",
         validators=[MinValueValidator(0), MaxValueValidator(100000)]
-    )
-    agency_share = models.FloatField(
-        null=True, blank=True, help_text="Agency share as percentage (e.g., 15 for 15%)",
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

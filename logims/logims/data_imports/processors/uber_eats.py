@@ -297,12 +297,16 @@ class UberEatsProcessor(BaseExcelProcessor):
         driver_agency_share = 0
         driver_insurance = 0
 
-        # Try to get driver's agency share and insurance from the driver model
+        # Try to get driver's agency share (from supervisor) and insurance from the driver model
         try:
             from logims.drivers.models import Driver
-            driver = Driver.objects.filter(uuid=driver_uuid).first()
+            driver = Driver.objects.select_related('supervisor').filter(uuid=driver_uuid).first()
             if driver:
-                driver_agency_share = float(driver.agency_share or 0)
+                # Get agency_share from supervisor's percentage
+                if driver.supervisor and driver.supervisor.percentage is not None:
+                    driver_agency_share = float(driver.supervisor.percentage)
+                else:
+                    driver_agency_share = 0
                 driver_insurance = float(driver.insurance or 0)
         except Exception:
             # If driver not found or error, use default values

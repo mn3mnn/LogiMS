@@ -10,6 +10,7 @@ from logims.drivers.api.views import (
     DriverLicenseViewSet,
     DriverNationalIDViewSet,
     DriverVehicleLicenseViewSet,
+    SupervisorViewSet,
 )
 
 from logims.companies.api.views import CompanyViewSet
@@ -23,6 +24,7 @@ router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("users", UserViewSet)
 router.register("drivers", DriverViewSet, basename="driver")
+router.register(r"supervisors", SupervisorViewSet, basename="supervisor")
 router.register(r"contracts", DriverContractViewSet, basename="contract")
 router.register(r"licenses", DriverLicenseViewSet, basename="license")
 router.register(r"national-ids", DriverNationalIDViewSet, basename="national-id")

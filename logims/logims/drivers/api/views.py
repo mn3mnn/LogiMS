@@ -14,6 +14,7 @@ from ..models import (
     DriverLicense,
     DriverNationalID,
     DriverVehicleLicense,
+    Supervisor,
 )
 from .serializers import (
     DriverSerializer,
@@ -22,6 +23,7 @@ from .serializers import (
     DriverLicenseSerializer,
     DriverNationalIDSerializer,
     DriverVehicleLicenseSerializer,
+    SupervisorSerializer,
 )
 from ..enums import DriverDocumentsStatus
 from logims.contrib.logging_utils import log_api_call, log_model_change, log_error
@@ -51,18 +53,18 @@ class DriverViewSet(viewsets.ModelViewSet):
         "first_name",
         "last_name",
         "email",
-        "reports_to",
         "phone_number",
         "nid",
         "uuid",
+        "supervisor__name",
     ]
-    ordering_fields = ["first_name", "last_name", "created_at", "updated_at", "agency_share", "insurance"]
+    ordering_fields = ["first_name", "last_name", "created_at", "updated_at", "insurance", "supervisor__percentage"]
     ordering = ["updated_at"]  # default ordering
 
     def get_queryset(self):
         qs = (
             Driver.objects
-            .select_related("company", "license", "vehicle_license", "national_id_doc")
+            .select_related("company", "license", "vehicle_license", "national_id_doc", "supervisor")
             .prefetch_related("contracts")
         )
         company_code = self.request.query_params.get("company_code")
@@ -305,6 +307,15 @@ class DriverVehicleLicenseViewSet(BaseDocumentViewSet):
 class DriverNationalIDViewSet(BaseDocumentViewSet):
     queryset = DriverNationalID.objects.all()
     serializer_class = DriverNationalIDSerializer
+
+
+class SupervisorViewSet(viewsets.ModelViewSet):
+    queryset = Supervisor.objects.all()
+    serializer_class = SupervisorSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "phone"]
+    ordering_fields = ["name", "created_at", "updated_at"]
+    ordering = ["name"]
 
 
 
