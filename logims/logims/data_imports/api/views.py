@@ -210,7 +210,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PaymentRecordSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PaymentRecordFilterSet
-    search_fields = ['driver_first_name', 'driver_last_name', 'driver_uuid']
+    search_fields = ['driver_first_name', 'driver_last_name', 'driver_uuid', 'supervisor_name_at_calculation']
     ordering_fields = ['created_at', 'total_revenue', 'payouts', 'final_net_earnings', 'applied_tax_rate', 'applied_agency_share_rate', 'tax_deduction', 'agency_share_deduction', 'insurance_deduction', 'total_deductions']
     ordering = ['-created_at']
     pagination_class = StandardResultsSetPagination
@@ -276,6 +276,220 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
             'top_companies': list(top_companies),
             'total_records': qs.count(),
         })
+
+    @action(detail=False, methods=['get'])
+    def aggregated(self, request):
+        """
+        Get aggregated payment records with flexible grouping.
+
+        Query Parameters:
+            - group_by: Comma-separated grouping dimensions (driver, supervisor, period, company)
+                       Examples: "driver", "supervisor", "driver,period", "supervisor,period"
+            - driver_id: Filter by specific driver
+            - supervisor_id: Filter by specific supervisor
+            - Other filters from PaymentRecordFilterSet apply
+
+        Returns paginated aggregated results.
+        """
+        from ..utils.aggregation import AggregationService
+        from ..api.serializers import PaymentRecordAggregatedSerializer
+
+        # Get group_by parameter
+        group_by = request.query_params.get('group_by', '').strip()
+        driver_id = request.query_params.get('driver_id')
+        supervisor_id = request.query_params.get('supervisor_id')
+
+        # Get base queryset with filters applied
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Apply aggregation
+        aggregated_qs = AggregationService.aggregate_payments(
+            queryset,
+            group_by=group_by if group_by else None,
+            supervisor_id=int(supervisor_id) if supervisor_id else None,
+            driver_id=int(driver_id) if driver_id else None
+        )
+
+        # Convert to list and format results
+        results = []
+        for row in aggregated_qs:
+            formatted = AggregationService.format_payment_aggregation_result(row)
+            results.append(formatted)
+
+        # Apply pagination
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(results, request)
+        if page is not None:
+            serializer = PaymentRecordAggregatedSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
+        serializer = PaymentRecordAggregatedSerializer(results, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        description="Export aggregated payment records as CSV."
+    )
+    @action(detail=False, methods=['get'], url_path='aggregated/export')
+    def export_aggregated(self, request):
+        """Export aggregated payment records as CSV with all current filters applied."""
+        try:
+            from ..utils.aggregation import AggregationService
+            import csv
+            from io import StringIO
+            from django.http import HttpResponse
+
+            # Get group_by parameter
+            group_by = request.query_params.get('group_by', '').strip()
+            driver_id = request.query_params.get('driver_id')
+            supervisor_id = request.query_params.get('supervisor_id')
+
+            # Get base queryset with filters applied
+            queryset = self.filter_queryset(self.get_queryset())
+
+            # Apply aggregation
+            aggregated_qs = AggregationService.aggregate_payments(
+                queryset,
+                group_by=group_by if group_by else None,
+                supervisor_id=int(supervisor_id) if supervisor_id else None,
+                driver_id=int(driver_id) if driver_id else None
+            )
+
+            # Convert to list and format results
+            results = []
+            for row in aggregated_qs:
+                formatted = AggregationService.format_payment_aggregation_result(row)
+                results.append(formatted)
+
+            record_count = len(results)
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Aggregated payment records export started | user={request.user.username} | count={record_count} | group_by={group_by}"
+                )
+            except Exception:
+                pass
+
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+
+            # Determine headers based on group_by
+            group_by_lower = group_by.lower()
+            if 'supervisor' in group_by_lower and 'driver' not in group_by_lower:
+                # Supervisor view: supervisor, period, company
+                headers = ["Supervisor ID", "Supervisor Name", "Driver Count"]
+                if 'period' in group_by_lower:
+                    headers.extend(["Period From", "Period To"])
+                if 'company' in group_by_lower:
+                    headers.append("Company")
+                headers.extend([
+                    "Total Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                    "Insurance Deduction", "Final Net Earnings", "Payouts", "Record Count"
+                ])
+                writer.writerow(headers)
+                for row in results:
+                    row_data = [
+                        row.get('supervisor_id_at_calculation') or "",
+                        row.get('supervisor_name_at_calculation') or "",
+                        row.get('driver_count') or 0,
+                    ]
+                    if 'period' in group_by_lower:
+                        row_data.extend([
+                            row.get('from_date') or "",
+                            row.get('to_date') or "",
+                        ])
+                    if 'company' in group_by_lower:
+                        row_data.append(row.get('company_name') or "")
+                    row_data.extend([
+                        row.get('total_revenue') or 0,
+                        row.get('total_deductions') or 0,
+                        row.get('tax_deduction') or 0,
+                        row.get('agency_share_deduction') or 0,
+                        row.get('insurance_deduction') or 0,
+                        row.get('final_net_earnings') or 0,
+                        row.get('payouts') or 0,
+                        row.get('record_count') or 0,
+                    ])
+                    writer.writerow(row_data)
+            elif 'driver' in group_by_lower:
+                # Driver view: driver, period, company
+                headers = ["Driver ID", "Driver UUID", "Driver Name", "Supervisor Name"]
+                if 'period' in group_by_lower:
+                    headers.extend(["Period From", "Period To"])
+                if 'company' in group_by_lower:
+                    headers.append("Company")
+                headers.extend([
+                    "Total Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                    "Insurance Deduction", "Final Net Earnings", "Payouts", "Record Count"
+                ])
+                writer.writerow(headers)
+                for row in results:
+                    row_data = [
+                        row.get('driver_id') or "",
+                        row.get('driver_uuid') or "",
+                        row.get('driver_name') or "",
+                        row.get('supervisor_name_at_calculation') or "",
+                    ]
+                    if 'period' in group_by_lower:
+                        row_data.extend([
+                            row.get('from_date') or "",
+                            row.get('to_date') or "",
+                        ])
+                    if 'company' in group_by_lower:
+                        row_data.append(row.get('company_name') or "")
+                    row_data.extend([
+                        row.get('total_revenue') or 0,
+                        row.get('total_deductions') or 0,
+                        row.get('tax_deduction') or 0,
+                        row.get('agency_share_deduction') or 0,
+                        row.get('insurance_deduction') or 0,
+                        row.get('final_net_earnings') or 0,
+                        row.get('payouts') or 0,
+                        row.get('record_count') or 0,
+                    ])
+                    writer.writerow(row_data)
+            else:
+                # Default: same as driver
+                writer.writerow([
+                    "Driver ID", "Driver UUID", "Driver Name", "Supervisor Name", "Company",
+                    "Total Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                    "Insurance Deduction", "Final Net Earnings", "Payouts", "Record Count"
+                ])
+                for row in results:
+                    writer.writerow([
+                        row.get('driver_id') or "",
+                        row.get('driver_uuid') or "",
+                        row.get('driver_name') or "",
+                        row.get('supervisor_name_at_calculation') or "",
+                        row.get('company_name') or "",
+                        row.get('total_revenue') or 0,
+                        row.get('total_deductions') or 0,
+                        row.get('tax_deduction') or 0,
+                        row.get('agency_share_deduction') or 0,
+                        row.get('insurance_deduction') or 0,
+                        row.get('final_net_earnings') or 0,
+                        row.get('payouts') or 0,
+                        row.get('record_count') or 0,
+                    ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Aggregated payment records export completed | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            group_name = group_by or 'raw'
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="payment_records_aggregated_{group_name}_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            log_error(e, context="Aggregated payment records export failed", user=request.user.username)
+            raise
 
     @action(detail=False, methods=['get'])
     def timeseries(self, request):
@@ -469,7 +683,7 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TripRecordSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = TripRecordFilterSet
-    search_fields = ['driver_first_name', 'driver_last_name', 'driver_uuid', 'trip_uuid']
+    search_fields = ['driver_first_name', 'driver_last_name', 'driver_uuid', 'trip_uuid', 'supervisor_name_at_calculation']
     ordering_fields = ['created_at', 'order_time', 'fare_amount', 'trip_distance', 'trip_duration_minutes']
     ordering = ['-created_at']
     pagination_class = StandardResultsSetPagination
@@ -527,110 +741,93 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def aggregated(self, request):
         """
-        Get aggregated trip records grouped by driver, period (from_date, to_date), and trip status.
-        Returns total fare and total distance for each driver for each period and status.
+        Get aggregated trip records with flexible grouping.
+
+        Query Parameters:
+            - group_by: Comma-separated grouping dimensions (driver, supervisor, period, status, company)
+                       Examples: "driver", "supervisor", "driver,period", "driver,period,status"
+                       Default: "driver,period,status" (backward compatible)
+            - driver_id: Filter by specific driver
+            - supervisor_id: Filter by specific supervisor
+            - Other filters from TripRecordFilterSet apply
+
+        Returns paginated aggregated results.
         """
-        from django.db.models import Sum, Count
-        
+        from ..utils.aggregation import AggregationService
+        from ..api.serializers import TripRecordAggregatedSerializer
+
+        # Get group_by parameter (default to backward-compatible grouping)
+        group_by = request.query_params.get('group_by', 'driver,period,status').strip()
+        driver_id = request.query_params.get('driver_id')
+        supervisor_id = request.query_params.get('supervisor_id')
+
+        # Get base queryset with filters applied
         queryset = self.filter_queryset(self.get_queryset())
-        
-        # Aggregate by driver_uuid, period (from_date, to_date), company, trip_status, and file_upload
-        aggregated = (
-            queryset.values(
-                'driver_uuid',
-                'driver_first_name',
-                'driver_last_name',
-                'file_upload',
-                'file_upload__from_date',
-                'file_upload__to_date',
-                'file_upload__company__name',
-                'file_upload__company__id',
-                'trip_status'
-            )
-            .annotate(
-                total_fare=Sum('fare_amount'),
-                total_distance=Sum('trip_distance'),
-                trip_count=Count('id')
-            )
-            .order_by('file_upload__from_date', 'file_upload__to_date', 'driver_first_name', 'driver_last_name', 'trip_status')
+
+        # Apply aggregation
+        aggregated_qs = AggregationService.aggregate_trips(
+            queryset,
+            group_by=group_by if group_by else None,
+            supervisor_id=int(supervisor_id) if supervisor_id else None,
+            driver_id=int(driver_id) if driver_id else None
         )
-        
-        # Get all unique driver UUIDs to batch fetch driver IDs
-        driver_uuids = list(set(row['driver_uuid'] for row in aggregated if row['driver_uuid']))
-        uuid_to_id = {
-            row['uuid']: row['id']
-            for row in Driver.objects.filter(uuid__in=driver_uuids).values('uuid', 'id')
-        }
-        
-        # Convert to list and format for serializer
+
+        # Convert to list and format results
         results = []
-        for row in aggregated:
-            driver_uuid = row['driver_uuid']
-            results.append({
-                'driver_uuid': driver_uuid,
-                'driver_first_name': row['driver_first_name'],
-                'driver_last_name': row['driver_last_name'],
-                'driver_name': f"{row['driver_first_name']} {row['driver_last_name']}".strip(),
-                'driver_id': uuid_to_id.get(driver_uuid),
-                'company_name': row['file_upload__company__name'],
-                'company_id': row['file_upload__company__id'],
-                'file_upload': row['file_upload'],
-                'from_date': row['file_upload__from_date'],
-                'to_date': row['file_upload__to_date'],
-                'trip_status': row['trip_status'],
-                'total_fare': row['total_fare'] or 0,
-                'total_distance': row['total_distance'] or 0,
-                'trip_count': row['trip_count']
-            })
-        
+        for row in aggregated_qs:
+            formatted = AggregationService.format_trip_aggregation_result(row)
+            results.append(formatted)
+
         # Apply pagination
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(results, request)
         if page is not None:
             serializer = TripRecordAggregatedSerializer(page, many=True)
             return paginator.get_paginated_response(serializer.data)
-        
+
         serializer = TripRecordAggregatedSerializer(results, many=True)
         return Response(serializer.data)
 
     @extend_schema(
         description="Export aggregated trip records as CSV."
     )
-    @action(detail=False, methods=['get'], url_path='export')
-    def export(self, request):
+    @action(detail=False, methods=['get'], url_path='aggregated/export')
+    def export_aggregated(self, request):
         """Export aggregated trip records as CSV with all current filters applied."""
         try:
-            from django.db.models import Sum, Count
-            
+            from ..utils.aggregation import AggregationService
+            import csv
+            from io import StringIO
+            from django.http import HttpResponse
+
+            # Get group_by parameter (default to backward-compatible grouping)
+            group_by = request.query_params.get('group_by', 'driver,period,status').strip()
+            driver_id = request.query_params.get('driver_id')
+            supervisor_id = request.query_params.get('supervisor_id')
+
+            # Get base queryset with filters applied
             queryset = self.filter_queryset(self.get_queryset())
-            
-            # Aggregate by driver_uuid, period (from_date, to_date), company, trip_status, and file_upload
-            aggregated = (
-                queryset.values(
-                    'driver_uuid',
-                    'driver_first_name',
-                    'driver_last_name',
-                    'file_upload',
-                    'file_upload__from_date',
-                    'file_upload__to_date',
-                    'file_upload__company__name',
-                    'file_upload__company__id',
-                    'trip_status'
-                )
-                .annotate(
-                    total_fare=Sum('fare_amount'),
-                    total_distance=Sum('trip_distance'),
-                    trip_count=Count('id')
-                )
-                .order_by('file_upload__from_date', 'file_upload__to_date', 'driver_first_name', 'driver_last_name', 'trip_status')
+
+            # Apply aggregation
+            aggregated_qs = AggregationService.aggregate_trips(
+                queryset,
+                group_by=group_by if group_by else None,
+                supervisor_id=int(supervisor_id) if supervisor_id else None,
+                driver_id=int(driver_id) if driver_id else None
             )
-            
-            record_count = aggregated.count()
+
+            # Convert to list and format results
+            results = []
+            for row in aggregated_qs:
+                formatted = AggregationService.format_trip_aggregation_result(row)
+                results.append(formatted)
+
+            record_count = len(results)
 
             # Safe logging
             try:
                 logger.info(
-                    f"Trip records export started | user={request.user.username} | count={record_count}"
+                    f"Aggregated trip records export started | user={request.user.username} | count={record_count} | group_by={group_by}"
                 )
             except Exception:
                 pass
@@ -638,36 +835,79 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
             # Prepare CSV data
             buffer = StringIO()
             writer = csv.writer(buffer)
-            writer.writerow([
-                "Period From", "Period To", "Upload ID", "Company", "Driver UUID",
-                "Driver Name", "Trip Status", "Trip Count", "Total Fare", "Total Distance"
-            ])
 
-            for row in aggregated:
+            # Determine headers based on group_by
+            if 'supervisor' in group_by and 'driver' not in group_by:
                 writer.writerow([
-                    row['file_upload__from_date'] or "",
-                    row['file_upload__to_date'] or "",
-                    row['file_upload'] or "",
-                    row['file_upload__company__name'] or "",
-                    row['driver_uuid'] or "",
-                    f"{row['driver_first_name']} {row['driver_last_name']}".strip(),
-                    row['trip_status'] or "",
-                    row['trip_count'] or 0,
-                    row['total_fare'] or 0,
-                    row['total_distance'] or 0,
+                    "Supervisor ID", "Supervisor Name", "Driver Count", "Company",
+                    "Total Fare", "Total Distance", "Avg Distance", "Trip Count", "Avg Duration (min)"
                 ])
+                for row in results:
+                    writer.writerow([
+                        row.get('supervisor_id_at_calculation') or "",
+                        row.get('supervisor_name_at_calculation') or "",
+                        row.get('driver_count') or 0,
+                        row.get('company_name') or "",
+                        row.get('total_fare') or 0,
+                        row.get('total_distance') or 0,
+                        row.get('avg_distance') or 0,
+                        row.get('trip_count') or 0,
+                        row.get('avg_duration') or 0,
+                    ])
+            elif 'driver' in group_by:
+                writer.writerow([
+                    "Driver ID", "Driver UUID", "Driver Name", "Supervisor Name", "Company",
+                    "Period From", "Period To", "Trip Status",
+                    "Total Fare", "Total Distance", "Avg Distance", "Trip Count", "Avg Duration (min)"
+                ])
+                for row in results:
+                    writer.writerow([
+                        row.get('driver_id') or "",
+                        row.get('driver_uuid') or "",
+                        row.get('driver_name') or "",
+                        row.get('supervisor_name_at_calculation') or "",
+                        row.get('company_name') or "",
+                        row.get('from_date') or "",
+                        row.get('to_date') or "",
+                        row.get('trip_status') or "",
+                        row.get('total_fare') or 0,
+                        row.get('total_distance') or 0,
+                        row.get('avg_distance') or 0,
+                        row.get('trip_count') or 0,
+                        row.get('avg_duration') or 0,
+                    ])
+            else:
+                # Default headers
+                writer.writerow([
+                    "Driver ID", "Driver UUID", "Driver Name", "Supervisor Name", "Company",
+                    "Total Fare", "Total Distance", "Avg Distance", "Trip Count", "Avg Duration (min)"
+                ])
+                for row in results:
+                    writer.writerow([
+                        row.get('driver_id') or "",
+                        row.get('driver_uuid') or "",
+                        row.get('driver_name') or "",
+                        row.get('supervisor_name_at_calculation') or "",
+                        row.get('company_name') or "",
+                        row.get('total_fare') or 0,
+                        row.get('total_distance') or 0,
+                        row.get('avg_distance') or 0,
+                        row.get('trip_count') or 0,
+                        row.get('avg_duration') or 0,
+                    ])
 
             # Safe logging
             try:
                 logger.info(
-                    f"Trip records export completed | user={request.user.username} | count={record_count}"
+                    f"Aggregated trip records export completed | user={request.user.username} | count={record_count}"
                 )
             except Exception:
                 pass
 
             # Create HTTP response
+            group_name = group_by.replace(',', '_') if group_by else 'raw'
             response = HttpResponse(buffer.getvalue(), content_type="text/csv")
-            response["Content-Disposition"] = f'attachment; filename="trip_records_export_{timezone.now().date()}.csv"'
+            response["Content-Disposition"] = f'attachment; filename="trip_records_aggregated_{group_name}_{timezone.now().date()}.csv"'
             return response
 
         except Exception as e:
