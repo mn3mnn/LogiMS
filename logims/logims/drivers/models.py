@@ -28,7 +28,7 @@ class Driver(models.Model):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     nid = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    uuid = models.CharField(max_length=100, null=True, blank=True)
+    uuid = models.CharField(max_length=100, null=True, blank=True, unique=True)
     email = models.EmailField(max_length=255, null=True, blank=True)
     supervisor = models.ForeignKey(Supervisor, on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
     phone_number = models.CharField(max_length=20)
