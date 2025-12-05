@@ -106,7 +106,11 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
             'total_revenue', 'net_fare', 'promotions', 'refunds_and_fees', 'payouts', 'bank_transfer',
             'cash_collected', 'fare_tax', 'tips', 'taxes', 'other_revenue',
             'total_deductions', 'tax_deduction', 'agency_share_deduction',
-            'insurance_deduction', 'final_net_earnings', 'created_at'
+            'insurance_deduction', 'final_net_earnings',
+            'calculation_version', 'calculated_at', 'applied_tax_rate',
+            'applied_agency_share_rate', 'applied_insurance_amount',
+            'driver_id_at_calculation', 'supervisor_id_at_calculation', 'supervisor_name_at_calculation',
+            'created_at'
         ]
 
     def get_driver_name(self, obj):
@@ -114,7 +118,11 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
         return f"{obj.driver_first_name} {obj.driver_last_name}"
 
     def get_driver_id(self, obj):
-        """Resolve internal Driver id by driver_uuid if available."""
+        """Resolve internal Driver id by driver FK or driver_uuid if available."""
+        # Use driver FK if available (more efficient)
+        if obj.driver:
+            return obj.driver.id
+        # Fallback to lookup by UUID
         if not obj.driver_uuid:
             return None
         driver = Driver.objects.filter(uuid=obj.driver_uuid).only('id').first()
@@ -138,7 +146,10 @@ class TripRecordSerializer(serializers.ModelSerializer):
             'vehicle_uuid', 'license_plate', 'service_type', 'order_time', 'arrival_time',
             'pickup_address', 'destination_address', 'trip_distance', 'trip_status',
             'order_submitted_time', 'trip_start_time', 'vehicle_location_at_assignment',
-            'fare_amount', 'trip_duration_minutes', 'created_at'
+            'fare_amount', 'trip_duration_minutes',
+            'calculation_version', 'calculated_at', 'driver_id_at_calculation',
+            'supervisor_id_at_calculation', 'supervisor_name_at_calculation',
+            'created_at'
         ]
 
     def get_driver_name(self, obj):
@@ -146,29 +157,88 @@ class TripRecordSerializer(serializers.ModelSerializer):
         return f"{obj.driver_first_name} {obj.driver_last_name}"
 
     def get_driver_id(self, obj):
+        """Resolve internal Driver id by driver FK or driver_uuid if available."""
+        # Use driver FK if available (more efficient)
+        if obj.driver:
+            return obj.driver.id
+        # Fallback to lookup by UUID
         if not obj.driver_uuid:
             return None
         driver = Driver.objects.filter(uuid=obj.driver_uuid).only('id').first()
         return driver.id if driver else None
 
 
+class PaymentRecordAggregatedSerializer(serializers.Serializer):
+    """Serializer for aggregated payment records with flexible grouping"""
+
+    # Driver fields (optional, present when grouped by driver)
+    driver_id = serializers.IntegerField(allow_null=True, required=False)
+    driver_uuid = serializers.CharField(allow_blank=True, required=False)
+    driver_first_name = serializers.CharField(allow_blank=True, required=False)
+    driver_last_name = serializers.CharField(allow_blank=True, required=False)
+    driver_name = serializers.CharField(allow_blank=True, required=False)
+
+    # Supervisor fields (optional, present when grouped by supervisor)
+    supervisor_id_at_calculation = serializers.IntegerField(allow_null=True, required=False)
+    supervisor_name_at_calculation = serializers.CharField(allow_blank=True, required=False)
+    driver_count = serializers.IntegerField(allow_null=True, required=False)  # For supervisor-level
+
+    # Company fields (optional, present when grouped by company)
+    company_id = serializers.IntegerField(allow_null=True, required=False)
+    company_name = serializers.CharField(allow_blank=True, required=False)
+    company_code = serializers.CharField(allow_blank=True, required=False)
+
+    # Period fields (optional, present when grouped by period)
+    file_upload = serializers.IntegerField(allow_null=True, required=False)
+    from_date = serializers.DateField(allow_null=True, required=False)
+    to_date = serializers.DateField(allow_null=True, required=False)
+
+    # Aggregated values
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    tips = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True, required=False)
+    total_deductions = serializers.DecimalField(max_digits=12, decimal_places=2)
+    tax_deduction = serializers.DecimalField(max_digits=12, decimal_places=2)
+    agency_share_deduction = serializers.DecimalField(max_digits=12, decimal_places=2)
+    insurance_deduction = serializers.DecimalField(max_digits=12, decimal_places=2)
+    final_net_earnings = serializers.DecimalField(max_digits=12, decimal_places=2)
+    payouts = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True, required=False)
+    record_count = serializers.IntegerField()
+
+
 class TripRecordAggregatedSerializer(serializers.Serializer):
-    """Serializer for aggregated trip records by driver, period, and status"""
-    
-    driver_uuid = serializers.CharField()
-    driver_first_name = serializers.CharField()
-    driver_last_name = serializers.CharField()
-    driver_name = serializers.CharField()
-    driver_id = serializers.IntegerField(allow_null=True)
-    company_name = serializers.CharField()
-    company_id = serializers.IntegerField()
-    file_upload = serializers.IntegerField()
-    from_date = serializers.DateField()
-    to_date = serializers.DateField()
-    trip_status = serializers.CharField(allow_null=True)
+    """Serializer for aggregated trip records with flexible grouping"""
+
+    # Driver fields (optional, present when grouped by driver)
+    driver_id = serializers.IntegerField(allow_null=True, required=False)
+    driver_uuid = serializers.CharField(allow_blank=True, required=False)
+    driver_first_name = serializers.CharField(allow_blank=True, required=False)
+    driver_last_name = serializers.CharField(allow_blank=True, required=False)
+    driver_name = serializers.CharField(allow_blank=True, required=False)
+
+    # Supervisor fields (optional, present when grouped by supervisor)
+    supervisor_id_at_calculation = serializers.IntegerField(allow_null=True, required=False)
+    supervisor_name_at_calculation = serializers.CharField(allow_blank=True, required=False)
+    driver_count = serializers.IntegerField(allow_null=True, required=False)  # For supervisor-level
+
+    # Company fields (optional, present when grouped by company)
+    company_id = serializers.IntegerField(allow_null=True, required=False)
+    company_name = serializers.CharField(allow_blank=True, required=False)
+    company_code = serializers.CharField(allow_blank=True, required=False)
+
+    # Period fields (optional, present when grouped by period)
+    file_upload = serializers.IntegerField(allow_null=True, required=False)
+    from_date = serializers.DateField(allow_null=True, required=False)
+    to_date = serializers.DateField(allow_null=True, required=False)
+
+    # Status field (optional, present when grouped by status)
+    trip_status = serializers.CharField(allow_null=True, required=False)
+
+    # Aggregated values
     total_fare = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_distance = serializers.DecimalField(max_digits=10, decimal_places=2)
+    avg_distance = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True, required=False)
     trip_count = serializers.IntegerField()
+    avg_duration = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True, required=False)
 
 
 class FileUploadDetailSerializer(serializers.ModelSerializer):

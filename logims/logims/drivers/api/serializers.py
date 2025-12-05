@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from logims.companies.models import Company
-from ..models import Driver, DriverNationalID, DriverContract, DriverLicense, DriverVehicleLicense
+from ..models import Driver, DriverNationalID, DriverContract, DriverLicense, DriverVehicleLicense, Supervisor
 
 
 class BaseDocumentSerializer(serializers.ModelSerializer):
@@ -62,6 +62,12 @@ class DriverNationalIDSerializer(BaseDocumentSerializer):
         fields = BaseDocumentSerializer.Meta.fields
 
 
+class SupervisorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supervisor
+        fields = ["id", "name", "phone", "percentage", "created_at", "updated_at"]
+
+
 class DriverSerializer(serializers.ModelSerializer):
     contracts = DriverContractSerializer(many=True, read_only=True)
     license = DriverLicenseSerializer(read_only=True)
@@ -69,35 +75,56 @@ class DriverSerializer(serializers.ModelSerializer):
     vehicle_license = DriverVehicleLicenseSerializer(read_only=True)
     company_code = serializers.CharField(source="company.code", read_only=True)
     company_name = serializers.CharField(source="company.name", read_only=True)
+    supervisor_id = serializers.IntegerField(source="supervisor.id", read_only=True)
+    supervisor_name = serializers.CharField(source="supervisor.name", read_only=True)
+    agency_share = serializers.SerializerMethodField()
 
     class Meta:
         model = Driver
         fields = [
-            "id", "first_name", "last_name", "nid", "uuid", "email", "reports_to", "phone_number",
+            "id", "first_name", "last_name", "nid", "uuid", "email", "phone_number",
             "is_active", "company_code", "company_name", "insurance", "agency_share",
+            "supervisor_id", "supervisor_name",
             "contracts", "license", "national_id_doc", "vehicle_license",
             "created_at", "updated_at",
         ]
 
+    def get_agency_share(self, obj):
+        """Calculate agency_share from supervisor's percentage"""
+        if obj.supervisor and obj.supervisor.percentage is not None:
+            return obj.supervisor.percentage
+        return None
+
 
 class DriverCreateUpdateSerializer(serializers.ModelSerializer):
     company_code = serializers.CharField(write_only=True)
+    supervisor_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Driver
         fields = [
-            "id", "first_name", "last_name", "nid", "uuid", "email", "reports_to", "phone_number",
-            "is_active", "company_code", "insurance", "agency_share",
+            "id", "first_name", "last_name", "nid", "uuid", "email", "phone_number",
+            "is_active", "company_code", "insurance", "supervisor_id",
         ]
 
     def create(self, validated_data):
         company_code = validated_data.pop("company_code")
+        supervisor_id = validated_data.pop("supervisor_id", None)
         company = Company.objects.get(code=company_code)
-        driver = Driver.objects.create(company=company, **validated_data)
+        supervisor = None
+        if supervisor_id:
+            supervisor = Supervisor.objects.get(id=supervisor_id)
+        driver = Driver.objects.create(company=company, supervisor=supervisor, **validated_data)
         return driver
 
     def update(self, instance, validated_data):
         company_code = validated_data.pop("company_code", None)
+        supervisor_id = validated_data.pop("supervisor_id", None)
         if company_code:
             instance.company = Company.objects.get(code=company_code)
+        if supervisor_id is not None:
+            if supervisor_id:
+                instance.supervisor = Supervisor.objects.get(id=supervisor_id)
+            else:
+                instance.supervisor = None
         return super().update(instance, validated_data)

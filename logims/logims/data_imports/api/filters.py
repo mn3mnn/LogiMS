@@ -45,18 +45,20 @@ class FileUploadFilterSet(filters.FilterSet):
 class PaymentRecordFilterSet(filters.FilterSet):
     """Filters for PaymentRecord with company and file upload date range."""
 
-    from_date = filters.DateFilter(field_name="file_upload__from_date", lookup_expr="gte")
     # Period-overlap filters applied to related FileUpload
     from_date = filters.DateFilter(method="filter_period_records")
     to_date = filters.DateFilter(method="filter_period_records")
     company = filters.NumberFilter(field_name="file_upload__company")
     company_code = filters.CharFilter(field_name="file_upload__company__code", lookup_expr="exact")
+    driver_id = filters.NumberFilter(field_name="driver_id", lookup_expr="exact")
+    supervisor_id = filters.NumberFilter(field_name="driver__supervisor_id", lookup_expr="exact")
+    file_upload = filters.NumberFilter(field_name="file_upload", lookup_expr="exact")
 
     class Meta:
         model = PaymentRecord
         fields = {
             "driver_uuid": ["exact"],
-            # company/from_date/to_date are defined above
+            # company/from_date/to_date/driver_id/supervisor_id are defined above
         }
 
     def filter_period_records(self, queryset, name, value):
@@ -85,6 +87,9 @@ class TripRecordFilterSet(filters.FilterSet):
     to_date = filters.DateFilter(method="filter_period_records")
     company = filters.NumberFilter(field_name="file_upload__company")
     company_code = filters.CharFilter(field_name="file_upload__company__code", lookup_expr="exact")
+    driver_id = filters.NumberFilter(field_name="driver_id", lookup_expr="exact")
+    supervisor_id = filters.NumberFilter(field_name="driver__supervisor_id", lookup_expr="exact")
+    file_upload = filters.NumberFilter(field_name="file_upload", lookup_expr="exact")
 
     class Meta:
         model = TripRecord
@@ -92,8 +97,7 @@ class TripRecordFilterSet(filters.FilterSet):
             "driver_uuid": ["exact"],
             "trip_status": ["exact"],
             "service_type": ["exact"],
-            "file_upload": ["exact"],
-            # company/from_date/to_date are defined above
+            # company/from_date/to_date/driver_id/supervisor_id/file_upload are defined above
         }
 
     def filter_period_records(self, queryset, name, value):

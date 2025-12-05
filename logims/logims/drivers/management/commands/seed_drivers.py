@@ -50,7 +50,6 @@ class Command(BaseCommand):
                 is_active=True,
                 company=company,
                 insurance=insurance,
-                agency_share=agency_share
             )
 
             # Common fake document dates

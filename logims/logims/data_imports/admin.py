@@ -123,7 +123,14 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         'driver_first_name', 'driver_last_name', 'driver_uuid',
         'file_upload__company__name'
     ]
-    readonly_fields = ['id', 'total_deductions', 'tax_deduction', 'agency_share_deduction', 'insurance_deduction', 'final_net_earnings', 'created_at', 'updated_at']
+    readonly_fields = [
+        'id', 'total_deductions', 'tax_deduction', 'agency_share_deduction',
+        'insurance_deduction', 'final_net_earnings',
+        'calculation_version', 'calculated_at', 'applied_tax_rate',
+        'applied_agency_share_rate', 'applied_insurance_amount',
+        'supervisor_id_at_calculation', 'supervisor_name_at_calculation',
+        'created_at', 'updated_at'
+    ]
 
     fieldsets = (
         ('Driver Information', {
@@ -144,8 +151,15 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         ('Deductions', {
             'fields': ('total_deductions', 'tax_deduction', 'agency_share_deduction', 'insurance_deduction')
         }),
+        ('Calculation Metadata', {
+            'fields': (
+                'calculation_version', 'calculated_at',
+                'applied_tax_rate', 'applied_agency_share_rate', 'applied_insurance_amount',
+                'supervisor_id_at_calculation', 'supervisor_name_at_calculation'
+            )
+        }),
         ('Metadata', {
-            'fields': ('file_upload', 'created_at', 'updated_at')
+            'fields': ('file_upload', 'driver', 'created_at', 'updated_at')
         }),
     )
 
@@ -166,7 +180,7 @@ class PaymentRecordAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         """Optimize queryset with select_related"""
-        return super().get_queryset(request).select_related('file_upload__company')
+        return super().get_queryset(request).select_related('file_upload__company', 'driver', 'driver__supervisor')
 
 
 @admin.register(TripRecord)
@@ -184,7 +198,10 @@ class TripRecordAdmin(admin.ModelAdmin):
         'pickup_address', 'destination_address', 'file_upload__company__name'
     ]
     readonly_fields = [
-        'id', 'trip_duration_minutes', 'created_at', 'updated_at'
+        'id', 'trip_duration_minutes',
+        'calculation_version', 'calculated_at',
+        'driver_id_at_calculation', 'supervisor_id_at_calculation', 'supervisor_name_at_calculation',
+        'created_at', 'updated_at'
     ]
 
     fieldsets = (
@@ -209,8 +226,14 @@ class TripRecordAdmin(admin.ModelAdmin):
         ('Trip Details', {
             'fields': ('trip_distance', 'trip_status', 'fare_amount')
         }),
+        ('Calculation Metadata', {
+            'fields': (
+                'calculation_version', 'calculated_at',
+                'driver_id_at_calculation', 'supervisor_id_at_calculation', 'supervisor_name_at_calculation'
+            )
+        }),
         ('Metadata', {
-            'fields': ('file_upload', 'id', 'created_at', 'updated_at')
+            'fields': ('file_upload', 'driver', 'id', 'created_at', 'updated_at')
         }),
     )
 
@@ -226,4 +249,4 @@ class TripRecordAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         """Optimize queryset with select_related"""
-        return super().get_queryset(request).select_related('file_upload__company')
+        return super().get_queryset(request).select_related('file_upload__company', 'driver')
