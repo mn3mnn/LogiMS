@@ -792,6 +792,80 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
     @extend_schema(
+        description="Export trip records as CSV."
+    )
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        """Export trip records as CSV with all current filters applied."""
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            record_count = queryset.count()
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Trip records export started | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow([
+                "ID", "Upload ID", "Period From", "Period To", "Company", "Trip UUID",
+                "Driver UUID", "Driver Name", "Supervisor Name", "Vehicle UUID", "License Plate",
+                "Service Type", "Order Time", "Arrival Time", "Pickup Address", "Destination Address",
+                "Trip Distance", "Trip Status", "Order Submitted Time", "Trip Start Time",
+                "Vehicle Location at Assignment", "Fare Amount", "Trip Duration (Minutes)", "Created At"
+            ])
+
+            for record in queryset.select_related('file_upload__company'):
+                writer.writerow([
+                    record.id,
+                    record.file_upload.id if record.file_upload else "",
+                    record.file_upload.from_date if record.file_upload else "",
+                    record.file_upload.to_date if record.file_upload else "",
+                    record.file_upload.company.name if record.file_upload and record.file_upload.company else "",
+                    record.trip_uuid or "",
+                    record.driver_uuid or "",
+                    f"{record.driver_first_name} {record.driver_last_name}".strip(),
+                    record.supervisor_name_at_calculation or "",
+                    record.vehicle_uuid or "",
+                    record.license_plate or "",
+                    record.service_type or "",
+                    record.order_time or "",
+                    record.arrival_time or "",
+                    record.pickup_address or "",
+                    record.destination_address or "",
+                    record.trip_distance or "",
+                    record.trip_status or "",
+                    record.order_submitted_time or "",
+                    record.trip_start_time or "",
+                    record.vehicle_location_at_assignment or "",
+                    record.fare_amount or "",
+                    record.trip_duration_minutes or "",
+                    record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else "",
+                ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Trip records export completed | user={request.user.username} | count={record_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="trip_records_export_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            log_error(e, context="Trip records export failed", user=request.user.username)
+            raise
+
+    @extend_schema(
         description="Export aggregated trip records as CSV."
     )
     @action(detail=False, methods=['get'], url_path='aggregated/export')
