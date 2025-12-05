@@ -106,7 +106,11 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
             'total_revenue', 'net_fare', 'promotions', 'refunds_and_fees', 'payouts', 'bank_transfer',
             'cash_collected', 'fare_tax', 'tips', 'taxes', 'other_revenue',
             'total_deductions', 'tax_deduction', 'agency_share_deduction',
-            'insurance_deduction', 'final_net_earnings', 'created_at'
+            'insurance_deduction', 'final_net_earnings',
+            'calculation_version', 'calculated_at', 'applied_tax_rate',
+            'applied_agency_share_rate', 'applied_insurance_amount',
+            'driver_id_at_calculation', 'supervisor_id_at_calculation', 'supervisor_name_at_calculation',
+            'created_at'
         ]
 
     def get_driver_name(self, obj):
@@ -114,7 +118,11 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
         return f"{obj.driver_first_name} {obj.driver_last_name}"
 
     def get_driver_id(self, obj):
-        """Resolve internal Driver id by driver_uuid if available."""
+        """Resolve internal Driver id by driver FK or driver_uuid if available."""
+        # Use driver FK if available (more efficient)
+        if obj.driver:
+            return obj.driver.id
+        # Fallback to lookup by UUID
         if not obj.driver_uuid:
             return None
         driver = Driver.objects.filter(uuid=obj.driver_uuid).only('id').first()
@@ -138,7 +146,10 @@ class TripRecordSerializer(serializers.ModelSerializer):
             'vehicle_uuid', 'license_plate', 'service_type', 'order_time', 'arrival_time',
             'pickup_address', 'destination_address', 'trip_distance', 'trip_status',
             'order_submitted_time', 'trip_start_time', 'vehicle_location_at_assignment',
-            'fare_amount', 'trip_duration_minutes', 'created_at'
+            'fare_amount', 'trip_duration_minutes',
+            'calculation_version', 'calculated_at', 'driver_id_at_calculation',
+            'supervisor_id_at_calculation', 'supervisor_name_at_calculation',
+            'created_at'
         ]
 
     def get_driver_name(self, obj):
@@ -146,6 +157,11 @@ class TripRecordSerializer(serializers.ModelSerializer):
         return f"{obj.driver_first_name} {obj.driver_last_name}"
 
     def get_driver_id(self, obj):
+        """Resolve internal Driver id by driver FK or driver_uuid if available."""
+        # Use driver FK if available (more efficient)
+        if obj.driver:
+            return obj.driver.id
+        # Fallback to lookup by UUID
         if not obj.driver_uuid:
             return None
         driver = Driver.objects.filter(uuid=obj.driver_uuid).only('id').first()

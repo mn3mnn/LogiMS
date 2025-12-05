@@ -133,6 +133,9 @@ class PaymentRecord(models.Model):
         on_delete=models.CASCADE,
         related_name="payment_records"
     )
+    driver = models.ForeignKey("drivers.Driver", on_delete=models.SET_NULL, null=True,
+                               blank=True, related_name="payment_records", help_text="Foreign key to Driver model")
+
     driver_uuid = models.CharField(max_length=100, db_index=True)
     driver_first_name = models.CharField(max_length=255)
     driver_last_name = models.CharField(max_length=255)
@@ -155,6 +158,25 @@ class PaymentRecord(models.Model):
     agency_share_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Agency share amount deducted")
     insurance_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Insurance amount deducted")
     final_net_earnings = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Final earnings after all deductions")
+
+    # Calculation metadata fields
+    calculation_version = models.CharField(max_length=50, default='1.0', help_text="Version of calculation logic used")
+    calculated_at = models.DateTimeField(null=True, blank=True, help_text="When calculations were last performed")
+
+    # Applied rates at calculation time (for audit)
+    applied_tax_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                           help_text="Total tax rate used at calculation time (sum of all active tax rates)")
+    applied_agency_share_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                                    help_text="Agency share percentage used at calculation time")
+    applied_insurance_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                                   help_text="Insurance amount used at calculation time")
+
+    # supervisor snapshots at calculation time
+    driver_id_at_calculation = models.IntegerField(null=True, blank=True, help_text="Driver ID at time of calculation")
+    supervisor_id_at_calculation = models.IntegerField(null=True, blank=True,
+                                                       help_text="Supervisor ID at time of calculation")
+    supervisor_name_at_calculation = models.CharField(max_length=255, null=True, blank=True,
+                                                      help_text="Supervisor name at time of calculation")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -209,6 +231,9 @@ class TripRecord(models.Model):
         on_delete=models.CASCADE,
         related_name="trip_records"
     )
+    driver = models.ForeignKey("drivers.Driver", on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name="trip_records", help_text="Foreign key to Driver model")
+
     trip_uuid = models.CharField(max_length=100, db_index=True, unique=True)
     driver_uuid = models.CharField(max_length=100, db_index=True)
     driver_first_name = models.CharField(max_length=255)
@@ -229,6 +254,17 @@ class TripRecord(models.Model):
 
     # Additional calculated fields
     trip_duration_minutes = models.PositiveIntegerField(null=True, blank=True)
+
+    # Calculation metadata fields
+    calculation_version = models.CharField(max_length=50, default='1.0', help_text="Version of calculation logic used")
+    calculated_at = models.DateTimeField(null=True, blank=True, help_text="When calculations were last performed")
+
+    # driver and supervisor snapshots at calculation time
+    driver_id_at_calculation = models.IntegerField(null=True, blank=True, help_text="Driver ID at time of calculation")
+    supervisor_id_at_calculation = models.IntegerField(null=True, blank=True,
+                                                       help_text="Supervisor ID at time of calculation")
+    supervisor_name_at_calculation = models.CharField(max_length=255, null=True, blank=True,
+                                                      help_text="Supervisor name at time of calculation")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

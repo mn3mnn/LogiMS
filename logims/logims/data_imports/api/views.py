@@ -216,7 +216,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('file_upload__company')
+        queryset = super().get_queryset().select_related('file_upload__company', 'driver', 'driver__supervisor')
         company_code = self.request.query_params.get('company_code')
         if company_code:
             queryset = queryset.filter(file_upload__company__code=company_code)
@@ -476,7 +476,7 @@ class TripRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get queryset with select_related for performance."""
-        return super().get_queryset().select_related('file_upload__company')
+        return super().get_queryset().select_related('file_upload__company', 'driver')
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
