@@ -384,7 +384,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 if 'company' in group_by_lower:
                     headers.append("Company")
                 headers.extend([
-                    "Total Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                    "Total Revenue", "Tips", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
                     "Insurance Deduction", "Final Net Earnings", "Payouts", "Record Count"
                 ])
                 writer.writerow(headers)
@@ -403,6 +403,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
                         row_data.append(row.get('company_name') or "")
                     row_data.extend([
                         row.get('total_revenue') or 0,
+                        row.get('tips') or 0,
                         row.get('total_deductions') or 0,
                         row.get('tax_deduction') or 0,
                         row.get('agency_share_deduction') or 0,
@@ -420,7 +421,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 if 'company' in group_by_lower:
                     headers.append("Company")
                 headers.extend([
-                    "Total Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                    "Total Revenue", "Tips", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
                     "Insurance Deduction", "Final Net Earnings", "Payouts", "Record Count"
                 ])
                 writer.writerow(headers)
@@ -440,6 +441,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
                         row_data.append(row.get('company_name') or "")
                     row_data.extend([
                         row.get('total_revenue') or 0,
+                        row.get('tips') or 0,
                         row.get('total_deductions') or 0,
                         row.get('tax_deduction') or 0,
                         row.get('agency_share_deduction') or 0,
@@ -453,7 +455,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 # Default: same as driver
                 writer.writerow([
                     "Driver ID", "Driver UUID", "Driver Name", "Supervisor Name", "Company",
-                    "Total Revenue", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
+                    "Total Revenue", "Tips", "Total Deductions", "Tax Deduction", "Agency Share Deduction",
                     "Insurance Deduction", "Final Net Earnings", "Payouts", "Record Count"
                 ])
                 for row in results:
@@ -464,6 +466,7 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
                         row.get('supervisor_name_at_calculation') or "",
                         row.get('company_name') or "",
                         row.get('total_revenue') or 0,
+                        row.get('tips') or 0,
                         row.get('total_deductions') or 0,
                         row.get('tax_deduction') or 0,
                         row.get('agency_share_deduction') or 0,

@@ -195,6 +195,7 @@ class PaymentRecordAggregatedSerializer(serializers.Serializer):
 
     # Aggregated values
     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    tips = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True, required=False)
     total_deductions = serializers.DecimalField(max_digits=12, decimal_places=2)
     tax_deduction = serializers.DecimalField(max_digits=12, decimal_places=2)
     agency_share_deduction = serializers.DecimalField(max_digits=12, decimal_places=2)

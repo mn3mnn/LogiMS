@@ -64,6 +64,7 @@ class AggregationService:
         if model_type == 'payment':
             return {
                 'total_revenue': Coalesce(Sum('total_revenue'), Decimal('0')),
+                'tips': Coalesce(Sum('tips'), Decimal('0')),
                 'total_deductions': Coalesce(Sum('total_deductions'), Decimal('0')),
                 'tax_deduction': Coalesce(Sum('tax_deduction'), Decimal('0')),
                 'agency_share_deduction': Coalesce(Sum('agency_share_deduction'), Decimal('0')),
@@ -269,6 +270,7 @@ class AggregationService:
                 'file_upload__from_date': row.file_upload.from_date if hasattr(row, 'file_upload') and row.file_upload else None,
                 'file_upload__to_date': row.file_upload.to_date if hasattr(row, 'file_upload') and row.file_upload else None,
                 'total_revenue': getattr(row, 'total_revenue', None) or Decimal('0'),
+                'tips': getattr(row, 'tips', None) or Decimal('0'),
                 'total_deductions': getattr(row, 'total_deductions', None) or Decimal('0'),
                 'tax_deduction': getattr(row, 'tax_deduction', None) or Decimal('0'),
                 'agency_share_deduction': getattr(row, 'agency_share_deduction', None) or Decimal('0'),
@@ -299,6 +301,7 @@ class AggregationService:
             'from_date': row.get('file_upload__from_date'),
             'to_date': row.get('file_upload__to_date'),
             'total_revenue': row.get('total_revenue', Decimal('0')),
+            'tips': row.get('tips', Decimal('0')),
             'total_deductions': row.get('total_deductions', Decimal('0')),
             'tax_deduction': row.get('tax_deduction', Decimal('0')),
             'agency_share_deduction': row.get('agency_share_deduction', Decimal('0')),

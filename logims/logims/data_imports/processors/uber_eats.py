@@ -299,10 +299,17 @@ class UberEatsProcessor(BaseExcelProcessor):
         """Uber Eats specific payment calculations with deductions"""
         from django.utils import timezone
 
-        # Get total income (اجمالي الدخل) - this should be the total_revenue field
-        total_income = payment_data.get('total_revenue', 0) or 0
-        if total_income:
-            total_income = float(total_income)
+        # Get total revenue and tips
+        total_revenue = payment_data.get('total_revenue', 0) or 0
+        if total_revenue:
+            total_revenue = float(total_revenue)
+
+        tips = payment_data.get('tips', 0) or 0
+        if tips:
+            tips = float(tips)
+
+        # Calculate total income (total_revenue + tips) - this is the base for deductions
+        total_income = total_revenue + tips
 
         # Get driver information for agency share and insurance
         driver_uuid = payment_data.get('driver_uuid', '')
@@ -330,10 +337,10 @@ class UberEatsProcessor(BaseExcelProcessor):
             # If driver not found or error, use default values
             pass
 
-        # Calculate tax deduction and get tax rate
+        # Calculate tax deduction and get tax rate (based on total_income = total_revenue + tips)
         tax_deduction, total_tax_rate = self._calculate_tax_deduction(total_income)
 
-        # Calculate agency share deduction (percentage of total income)
+        # Calculate agency share deduction (percentage of total_income = total_revenue + tips)
         agency_share_deduction = (total_income * driver_agency_share / 100) if driver_agency_share else 0
 
         # Insurance deduction (fixed amount)
@@ -342,7 +349,7 @@ class UberEatsProcessor(BaseExcelProcessor):
         # Calculate total deductions
         total_deductions = tax_deduction + agency_share_deduction + insurance_deduction
 
-        # Calculate final net earnings (total income - all deductions)
+        # Calculate final net earnings: total_income - total_deductions
         final_net_earnings = total_income - total_deductions
 
         payment_data.update({
