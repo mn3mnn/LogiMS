@@ -308,8 +308,8 @@ class UberEatsProcessor(BaseExcelProcessor):
         if tips:
             tips = float(tips)
 
-        # Calculate total income (total_revenue + tips) - this is the base for deductions
-        total_income = total_revenue + tips
+        # Calculate total income (total_revenue - tips) - this is the base for deductions
+        total_income = total_revenue - tips
 
         # Get driver information for agency share and insurance
         driver_uuid = payment_data.get('driver_uuid', '')
