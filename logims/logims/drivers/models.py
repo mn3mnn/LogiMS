@@ -9,7 +9,7 @@ from logims.storage_backends import R2MediaStorage
 
 class Supervisor(models.Model):
     name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=16, db_index=True)
     percentage = models.FloatField(
         help_text="Percentage (e.g., 15 for 15%)",
         validators=[MinValueValidator(0), MaxValueValidator(100)]
@@ -31,7 +31,7 @@ class Driver(models.Model):
     uuid = models.CharField(max_length=100, null=True, blank=True, unique=True)
     email = models.EmailField(max_length=255, null=True, blank=True)
     supervisor = models.ForeignKey(Supervisor, on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
-    phone_number = models.CharField(max_length=20)
+    phone_number = models.CharField(max_length=16, db_index=True)
     is_active = models.BooleanField(default=True)
     company = models.ForeignKey("companies.Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="drivers")
     insurance = models.FloatField(
