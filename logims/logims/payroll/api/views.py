@@ -283,6 +283,70 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
             })
         return Response(result)
 
+    @action(detail=False, methods=['get'])
+    def expenses_timeseries(self, request):
+        """
+        Time series for expenses aggregated by upload period.
+        """
+        from django.db.models import Sum, Q
+        from logims.uploads.models import FileUpload, FileType
+
+        # Query expenses file uploads with same filters as payment records
+        expenses_queryset = FileUpload.objects.filter(
+            file_type=FileType.EXPENSES
+        ).select_related('metadata', 'metadata__company')
+
+        # Apply company filter if provided
+        company_code = request.query_params.get('company_code')
+        if company_code:
+            expenses_queryset = expenses_queryset.filter(
+                metadata__company__code=company_code
+            )
+
+        # Apply date range filters (same logic as payment records)
+        from_date = request.query_params.get('from_date')
+        to_date = request.query_params.get('to_date')
+
+        if from_date and to_date:
+            expenses_queryset = expenses_queryset.filter(
+                Q(metadata__from_date__lte=to_date) &
+                Q(metadata__to_date__gte=from_date)
+            )
+        elif from_date:
+            expenses_queryset = expenses_queryset.filter(
+                metadata__to_date__gte=from_date
+            )
+        elif to_date:
+            expenses_queryset = expenses_queryset.filter(
+                metadata__from_date__lte=to_date
+            )
+
+        # Group by period (from_date, to_date) and company, then sum amounts
+        # This ensures all expenses in the same period are aggregated together
+        series = (
+            expenses_queryset.values(
+                'metadata__from_date',
+                'metadata__to_date',
+                'metadata__company__name'
+            )
+            .annotate(
+                total_expenses=Sum('metadata__amount')
+            )
+            .filter(metadata__amount__isnull=False, metadata__from_date__isnull=False, metadata__to_date__isnull=False)
+            .order_by('metadata__from_date')
+        )
+
+        result = []
+        for row in series:
+            result.append({
+                'upload_id': None,  # Not needed since we're grouping by period
+                'from_date': row['metadata__from_date'],
+                'to_date': row['metadata__to_date'],
+                'company': row['metadata__company__name'],
+                'total_expenses': row['total_expenses'] or 0,
+            })
+        return Response(result)
+
     @extend_schema(description="Export payment records as CSV.")
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
