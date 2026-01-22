@@ -317,5 +317,56 @@ class SupervisorViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
 
+    @extend_schema(
+        description="Export supervisors as CSV."
+    )
+    @action(detail=False, methods=["get"], url_path="export")
+    def export_supervisors(self, request):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            supervisor_count = queryset.count()
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Supervisor export started | user={request.user.username} | count={supervisor_count}"
+                )
+            except Exception:
+                pass
+
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow([
+                "ID", "Name", "Phone", "Percentage", "Created At", "Updated At"
+            ])
+
+            for supervisor in queryset:
+                writer.writerow([
+                    supervisor.id,
+                    supervisor.name,
+                    supervisor.phone,
+                    supervisor.percentage,
+                    supervisor.created_at.strftime("%Y-%m-%d %H:%M:%S") if supervisor.created_at else "",
+                    supervisor.updated_at.strftime("%Y-%m-%d %H:%M:%S") if supervisor.updated_at else "",
+                ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Supervisor export completed | user={request.user.username} | count={supervisor_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="supervisors_export_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            log_error(e, context="Supervisor export failed", user=request.user.username)
+            raise
+
 
 
