@@ -73,7 +73,8 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Get summary statistics for payment records.
         """
-        from django.db.models import Sum, Count
+        from django.db.models import Sum, Count, Q
+        from logims.uploads.models import FileUpload, FileType
 
         queryset = self.filter_queryset(self.get_queryset())
 
@@ -91,6 +92,48 @@ class PaymentRecordViewSet(viewsets.ReadOnlyModelViewSet):
         tax = summary.get('total_tax_deduction') or 0
         insurance = summary.get('total_insurance_deduction') or 0
         summary['total_tax_and_insurance'] = tax + insurance
+
+        # Calculate total expenses from expenses file uploads
+        # Apply the same filters as payment records
+        expenses_queryset = FileUpload.objects.filter(
+            file_type=FileType.EXPENSES
+        ).select_related('metadata')
+
+        # Apply company filter if provided
+        company_code = request.query_params.get('company_code')
+        if company_code:
+            expenses_queryset = expenses_queryset.filter(
+                metadata__company__code=company_code
+            )
+
+        # Apply date range filters (same logic as payment records)
+        from_date = request.query_params.get('from_date')
+        to_date = request.query_params.get('to_date')
+
+        if from_date and to_date:
+            expenses_queryset = expenses_queryset.filter(
+                Q(metadata__from_date__lte=to_date) &
+                Q(metadata__to_date__gte=from_date)
+            )
+        elif from_date:
+            expenses_queryset = expenses_queryset.filter(
+                metadata__to_date__gte=from_date
+            )
+        elif to_date:
+            expenses_queryset = expenses_queryset.filter(
+                metadata__from_date__lte=to_date
+            )
+
+        # Sum amounts from expenses metadata
+        expenses_aggregate = expenses_queryset.aggregate(
+            total_expenses=Sum('metadata__amount')
+        )
+        total_expenses = expenses_aggregate.get('total_expenses') or 0
+        summary['total_expenses'] = total_expenses
+
+        # Calculate net agency profit
+        agency_profit = summary.get('agency_profit') or 0
+        summary['net_agency_profit'] = agency_profit - total_expenses
 
         return Response(summary)
 
