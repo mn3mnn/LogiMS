@@ -202,6 +202,13 @@ class FileUploadMetadataMixin:
             return metadata.company.name
         return None
 
+    def get_company(self, obj):
+        """Get company ID from metadata"""
+        metadata = getattr(obj, 'metadata', None)
+        if metadata and metadata.company:
+            return metadata.company.id
+        return None
+
     def get_from_date(self, obj):
         """Get from_date from metadata"""
         metadata = getattr(obj, 'metadata', None)
@@ -238,6 +245,7 @@ class FileUploadMetadataMixin:
 class FileUploadListSerializer(FileUploadMetadataMixin, serializers.ModelSerializer):
     """Simplified serializer for file upload listing"""
 
+    company = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     file_type_display = serializers.CharField(source='get_file_type_display', read_only=True)
@@ -252,7 +260,7 @@ class FileUploadListSerializer(FileUploadMetadataMixin, serializers.ModelSeriali
         model = FileUpload
         fields = [
             'id', 'title', 'file_type', 'file_type_display',
-            'file_name', 'file_url', 'company_name', 'from_date', 'to_date', 'amount',
+            'file_name', 'file_url', 'company', 'company_name', 'from_date', 'to_date', 'amount',
             'tag_details', 'status', 'status_display', 'processed_records_count', 'created_at'
         ]
 
@@ -260,6 +268,7 @@ class FileUploadListSerializer(FileUploadMetadataMixin, serializers.ModelSeriali
 class FileUploadDetailSerializer(FileUploadMetadataMixin, serializers.ModelSerializer):
     """Detailed serializer for file upload with related records"""
 
+    company = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     file_type_display = serializers.CharField(source='get_file_type_display', read_only=True)
@@ -273,7 +282,7 @@ class FileUploadDetailSerializer(FileUploadMetadataMixin, serializers.ModelSeria
         model = FileUpload
         fields = [
             'id', 'title', 'file_type', 'file_type_display',
-            'file', 'file_name', 'company_name', 'from_date', 'to_date', 'amount',
+            'file', 'file_name', 'company', 'company_name', 'from_date', 'to_date', 'amount',
             'tag_details', 'status', 'status_display', 'processing_started_at', 'processing_completed_at',
             'error_message', 'processed_records_count', 'created_by', 'created_at', 'updated_at'
         ]
