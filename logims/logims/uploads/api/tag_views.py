@@ -4,6 +4,7 @@ Tag API views for core module.
 import logging
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema
 from logims.uploads.models import Tag
 from .serializers import TagSerializer
 from logims.contrib.logging_utils import log_model_change
@@ -11,6 +12,7 @@ from logims.contrib.logging_utils import log_model_change
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(tags=["Uploads"])
 class TagViewSet(viewsets.ModelViewSet):
     """ViewSet for managing document tags"""
 

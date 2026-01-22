@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @extend_schema(
+    tags=["Trips"],
     parameters=[
         OpenApiParameter(name="company", description="Filter by company ID", required=False, type=int),
         OpenApiParameter(name="company_code", description="Filter by company code", required=False, type=str),

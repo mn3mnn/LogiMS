@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 @extend_schema(
+    tags=["Drivers"],
     parameters=[
         OpenApiParameter(
             name="company_code", description="Filter drivers by company code", required=False,
@@ -271,7 +272,7 @@ class BaseDocumentViewSet(viewsets.ModelViewSet):
         ),
     ]
 
-    @extend_schema(parameters=filter_params)
+    @extend_schema(tags=["Drivers"], parameters=filter_params)
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
@@ -309,6 +310,7 @@ class DriverNationalIDViewSet(BaseDocumentViewSet):
     serializer_class = DriverNationalIDSerializer
 
 
+@extend_schema(tags=["Drivers"])
 class SupervisorViewSet(viewsets.ModelViewSet):
     queryset = Supervisor.objects.all()
     serializer_class = SupervisorSerializer

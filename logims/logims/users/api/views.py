@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
+from drf_spectacular.utils import extend_schema
 
 from logims.users.models import User
 
@@ -17,6 +18,7 @@ from logims.contrib.logging_utils import log_user_action, log_model_change
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(tags=["Users"])
 class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = UserSerializer
     queryset = User.objects.all()
@@ -56,6 +58,7 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
+@extend_schema(tags=["Authentication"])
 class LogoutView(APIView):
     """
     Logout endpoint — invalidates the user's authentication token.
