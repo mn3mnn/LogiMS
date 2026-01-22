@@ -91,8 +91,10 @@ LOCAL_APPS = [
     "logims.companies",
     "logims.drivers",
     "logims.orders",
-    "logims.data_imports",
     "logims.notifications",
+    "logims.uploads",
+    "logims.payroll",
+    "logims.trips",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -377,7 +379,17 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "logims.data_imports": {
+        "logims.uploads": {
+            "handlers": ["console", "file_general", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.payroll": {
+            "handlers": ["console", "file_general", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.trips": {
             "handlers": ["console", "file_general", "file_celery"],
             "level": "INFO",
             "propagate": False,
