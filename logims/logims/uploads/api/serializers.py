@@ -61,6 +61,39 @@ class FileUploadSerializer(serializers.ModelSerializer):
             self.fields['file'].required = True
         else:
             self.fields['file'].required = False
+        
+        # Clean up empty tag strings from FormData before field validation
+        # This prevents PrimaryKeyRelatedField from trying to convert empty strings to integers
+        self._clean_tags_in_initial_data()
+
+    def _clean_tags_in_initial_data(self):
+        """Clean up empty tag strings from FormData before validation"""
+        if not (hasattr(self, 'initial_data') and self.initial_data and 'tags' in self.initial_data):
+            return
+        
+        # Make QueryDict mutable if needed
+        if hasattr(self.initial_data, '_mutable') and not self.initial_data._mutable:
+            self.initial_data._mutable = True
+        
+        # Extract tags list from various input formats
+        if hasattr(self.initial_data, 'getlist'):
+            tags_list = self.initial_data.getlist('tags')
+        elif isinstance(self.initial_data.get('tags'), list):
+            tags_list = self.initial_data.get('tags')
+        else:
+            tags_list = [self.initial_data.get('tags')]
+        
+        # Filter out empty strings and whitespace-only strings
+        cleaned_tags = [tag for tag in tags_list if tag and str(tag).strip()]
+        
+        # Update initial_data with cleaned tags
+        # Empty list after cleaning means clear tags (was sent but empty)
+        if hasattr(self.initial_data, 'setlist'):
+            # QueryDict - use setlist
+            self.initial_data.setlist('tags', cleaned_tags)
+        else:
+            # Regular dict
+            self.initial_data['tags'] = cleaned_tags
 
     def get_company_name(self, obj):
         """Get company name from metadata"""
@@ -68,6 +101,14 @@ class FileUploadSerializer(serializers.ModelSerializer):
         if metadata and metadata.company:
             return metadata.company.name
         return None
+
+    def validate_tags(self, value):
+        """Validate tags field - preserve None, filter empty values from lists"""
+        if value is None:
+            # None means tags weren't provided - preserve it to indicate "don't change"
+            return None
+        # Filter out any empty/None values from the list
+        return [tag for tag in value if tag]
 
     def validate(self, data):
         """Validate file upload data"""
@@ -102,7 +143,7 @@ class FileUploadSerializer(serializers.ModelSerializer):
         return file_upload
 
     def update(self, instance, validated_data):
-        """Update FileUpload and metadata if provided"""
+        """Update FileUpload and metadata"""
         # Extract metadata fields
         metadata_fields = self._extract_metadata_fields(validated_data)
         tags = validated_data.pop('tags', None)
@@ -113,10 +154,13 @@ class FileUploadSerializer(serializers.ModelSerializer):
         instance.save()
 
         # Update tags if provided
+        # None = tags not in request, keep existing
+        # [] = tags sent as empty, clear all tags
+        # [id1, id2, ...] = set these tags
         if tags is not None:
             instance.tags.set(tags)
 
-        # Update or create metadata
+        # Update metadata
         with transaction.atomic():
             self._update_metadata(instance, **metadata_fields)
 
