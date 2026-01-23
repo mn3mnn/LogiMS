@@ -47,7 +47,7 @@ class FileUploadViewSet(FileUploadStatsMixin, viewsets.ModelViewSet):
     search_fields = ['title', 'file', 'tags__name']
     ordering_fields = ['created_at', 'processed_records_count', 'status']
     ordering = ['-created_at']
-    http_method_names = ['get', 'post', 'patch', 'delete']
+    http_method_names = ['get', 'post', 'put', 'delete']
     pagination_class = StandardResultsSetPagination
 
     def get_serializer_class(self):
@@ -108,58 +108,36 @@ class FileUploadViewSet(FileUploadStatsMixin, viewsets.ModelViewSet):
             log_error(e, context="File upload creation failed", user=request.user.username)
             raise
 
-    def partial_update(self, request, *args, **kwargs):
-        """Update file upload (PATCH) and trigger reprocessing if needed"""
+    def update(self, request, *args, **kwargs):
+        """Update file upload using PUT (with optional file)"""
         instance = self.get_object()
-        original_data = FileUploadService.get_original_metadata(instance)
-
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        file_upload = serializer.save()
 
-        # Update tags separately if provided
-        tags = request.data.getlist('tags')
-        if tags:
-            tag_ids = [int(tag_id) for tag_id in tags if tag_id]
-            instance.tags.set(tag_ids)
-        elif 'tags' in request.data:
-            instance.tags.clear()
-
-        serializer.save()
-
-        # Refresh from DB to get updated metadata
-        instance.refresh_from_db()
-        if hasattr(instance, 'metadata'):
-            instance.metadata.refresh_from_db()
-
-        # Check if any fields that require reprocessing have changed
-        should_reprocess, changed_fields = FileUploadService.should_reprocess(
-            instance, request.data, original_data
-        )
+        # Always reprocess if file type is processable
+        if file_upload.file_type in PROCESSABLE_FILE_TYPES:
+            FileUploadService.prepare_and_queue_reprocessing(
+                file_upload, ['update'], request.user
+            )
 
         # Log the update
         FileUploadService.log_file_upload_operation(
-            instance, "update", request.user
+            file_upload, "update", request.user
         )
 
         # Log audit trail
-        FileUploadService.log_audit(instance, 'updated', request.user)
+        FileUploadService.log_audit(file_upload, 'updated', request.user)
 
-        # Trigger reprocessing if needed
-        if should_reprocess:
-            FileUploadService.prepare_and_queue_reprocessing(
-                instance, changed_fields, request.user
-            )
-
-        response_serializer = FileUploadDetailSerializer(instance)
+        response_serializer = FileUploadDetailSerializer(file_upload)
         message = 'File upload updated successfully.'
-        if should_reprocess and instance.file_type in PROCESSABLE_FILE_TYPES:
+        if file_upload.file_type in PROCESSABLE_FILE_TYPES:
             message += ' Reprocessing has been queued.'
 
         return Response({
             'file_upload': response_serializer.data,
             'message': message,
-            'reprocessing_queued': should_reprocess and instance.file_type in PROCESSABLE_FILE_TYPES,
-            'changed_fields': changed_fields
+            'reprocessing_queued': file_upload.file_type in PROCESSABLE_FILE_TYPES
         }, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
