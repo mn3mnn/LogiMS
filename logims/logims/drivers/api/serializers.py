@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from logims.companies.models import Company
 from ..models import Driver, DriverNationalID, DriverContract, DriverLicense, DriverVehicleLicense, Supervisor
+from ..utils import validate_phone_number
 
 
 class BaseDocumentSerializer(serializers.ModelSerializer):
@@ -67,6 +68,10 @@ class SupervisorSerializer(serializers.ModelSerializer):
         model = Supervisor
         fields = ["id", "name", "phone", "percentage", "created_at", "updated_at"]
 
+    def validate_phone(self, value):
+        """Validate phone number using SSOT validator."""
+        return validate_phone_number(value)
+
 
 class DriverSerializer(serializers.ModelSerializer):
     contracts = DriverContractSerializer(many=True, read_only=True)
@@ -106,6 +111,10 @@ class DriverCreateUpdateSerializer(serializers.ModelSerializer):
             "id", "first_name", "last_name", "nid", "uuid", "email", "phone_number",
             "is_active", "company_code", "insurance", "supervisor_id",
         ]
+
+    def validate_phone_number(self, value):
+        """Validate phone number using SSOT validator."""
+        return validate_phone_number(value)
 
     def create(self, validated_data):
         company_code = validated_data.pop("company_code")

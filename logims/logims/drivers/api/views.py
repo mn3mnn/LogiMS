@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 @extend_schema(
+    tags=["Drivers"],
     parameters=[
         OpenApiParameter(
             name="company_code", description="Filter drivers by company code", required=False,
@@ -271,7 +272,7 @@ class BaseDocumentViewSet(viewsets.ModelViewSet):
         ),
     ]
 
-    @extend_schema(parameters=filter_params)
+    @extend_schema(tags=["Drivers"], parameters=filter_params)
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
@@ -309,6 +310,7 @@ class DriverNationalIDViewSet(BaseDocumentViewSet):
     serializer_class = DriverNationalIDSerializer
 
 
+@extend_schema(tags=["Drivers"])
 class SupervisorViewSet(viewsets.ModelViewSet):
     queryset = Supervisor.objects.all()
     serializer_class = SupervisorSerializer
@@ -316,6 +318,57 @@ class SupervisorViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "phone"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
+
+    @extend_schema(
+        description="Export supervisors as CSV."
+    )
+    @action(detail=False, methods=["get"], url_path="export")
+    def export_supervisors(self, request):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            supervisor_count = queryset.count()
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Supervisor export started | user={request.user.username} | count={supervisor_count}"
+                )
+            except Exception:
+                pass
+
+            # Prepare CSV data
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow([
+                "ID", "Name", "Phone", "Percentage", "Created At", "Updated At"
+            ])
+
+            for supervisor in queryset:
+                writer.writerow([
+                    supervisor.id,
+                    supervisor.name,
+                    supervisor.phone,
+                    supervisor.percentage,
+                    supervisor.created_at.strftime("%Y-%m-%d %H:%M:%S") if supervisor.created_at else "",
+                    supervisor.updated_at.strftime("%Y-%m-%d %H:%M:%S") if supervisor.updated_at else "",
+                ])
+
+            # Safe logging
+            try:
+                logger.info(
+                    f"Supervisor export completed | user={request.user.username} | count={supervisor_count}"
+                )
+            except Exception:
+                pass
+
+            # Create HTTP response
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="supervisors_export_{timezone.now().date()}.csv"'
+            return response
+
+        except Exception as e:
+            log_error(e, context="Supervisor export failed", user=request.user.username)
+            raise
 
 
 

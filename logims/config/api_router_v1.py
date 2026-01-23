@@ -14,11 +14,10 @@ from logims.drivers.api.views import (
 )
 
 from logims.companies.api.views import CompanyViewSet
-from logims.data_imports.api.views import (
-    FileUploadViewSet,
-    PaymentRecordViewSet,
-    TripRecordViewSet
-)
+from logims.uploads.api.views import FileUploadViewSet
+from logims.uploads.api.tag_views import TagViewSet
+from logims.payroll.api.views import PaymentRecordViewSet
+from logims.trips.api.views import TripRecordViewSet
 
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
@@ -30,9 +29,11 @@ router.register(r"licenses", DriverLicenseViewSet, basename="license")
 router.register(r"national-ids", DriverNationalIDViewSet, basename="national-id")
 router.register(r"vehicle-licenses", DriverVehicleLicenseViewSet, basename="vehicle-license")
 router.register(r"companies", CompanyViewSet, basename="companies")
-router.register(r"data-imports", FileUploadViewSet, basename="data-import")
-router.register(r"payment-records", PaymentRecordViewSet, basename="payment-record")
-router.register(r"trip-records", TripRecordViewSet, basename="trip-record")
+
+router.register(r"uploads", FileUploadViewSet, basename="file-upload")
+router.register(r"tags", TagViewSet, basename="tag")
+router.register(r"payroll/records", PaymentRecordViewSet, basename="payment-record")
+router.register(r"trips/records", TripRecordViewSet, basename="trip-record")
 
 
 app_name = "api"

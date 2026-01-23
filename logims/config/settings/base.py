@@ -91,8 +91,10 @@ LOCAL_APPS = [
     "logims.companies",
     "logims.drivers",
     "logims.orders",
-    "logims.data_imports",
     "logims.notifications",
+    "logims.uploads",
+    "logims.payroll",
+    "logims.trips",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -377,7 +379,17 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "logims.data_imports": {
+        "logims.uploads": {
+            "handlers": ["console", "file_general", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.payroll": {
+            "handlers": ["console", "file_general", "file_celery"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "logims.trips": {
             "handlers": ["console", "file_general", "file_celery"],
             "level": "INFO",
             "propagate": False,
@@ -493,6 +505,15 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
     "SCHEMA_PATH_PREFIX": "/api",
+    "TAGS": [
+        {"name": "Authentication", "description": "User authentication endpoints"},
+        {"name": "Users", "description": "User management endpoints"},
+        {"name": "Drivers", "description": "Driver and driver document management endpoints"},
+        {"name": "Companies", "description": "Company management endpoints"},
+        {"name": "Uploads", "description": "File upload and tag management endpoints"},
+        {"name": "Payroll", "description": "Payment record endpoints"},
+        {"name": "Trips", "description": "Trip record endpoints"},
+    ],
 }
 # Your stuff...
 # ------------------------------------------------------------------------------
